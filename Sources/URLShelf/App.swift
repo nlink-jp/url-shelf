@@ -36,6 +36,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var statusItem: StatusItemController?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        statusItem = StatusItemController()
+        statusItem = StatusItemController(model: AppModel())
     }
 }
