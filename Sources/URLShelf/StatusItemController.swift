@@ -24,6 +24,7 @@ final class StatusItemController: NSObject {
     private let model: AppModel
     private let statusItem: NSStatusItem
     private let menu = NSMenu()
+    private let settings: SettingsWindowController
 
     /// Which folder each submenu shows. `NSMenu.delegate` is weak and menus are
     /// rebuilt constantly, so the mapping lives here rather than on the menus.
@@ -31,14 +32,48 @@ final class StatusItemController: NSObject {
 
     init(model: AppModel) {
         self.model = model
+        settings = SettingsWindowController(model: model)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
-        statusItem.button?.image = NSImage(
-            systemSymbolName: "books.vertical",
-            accessibilityDescription: "URL Shelf")
+        statusItem.button?.image = Self.defaultImage
         menu.delegate = self
         statusItem.menu = menu
+        installDropTarget()
+    }
+
+    private static let defaultImage = NSImage(
+        systemSymbolName: "books.vertical", accessibilityDescription: "URL Shelf")
+
+    private func installDropTarget() {
+        guard let button = statusItem.button else { return }
+        let drop = URLDropView(frame: button.bounds)
+        drop.autoresizingMask = [.width, .height]
+        drop.button = button
+        drop.onDrop = { [weak self] url in self?.acceptDroppedURL(url) ?? false }
+        button.addSubview(drop)
+    }
+
+    private func acceptDroppedURL(_ url: URL) -> Bool {
+        do {
+            try model.addEntry(url: url, in: model.inboxURL())
+            confirmDrop()
+            return true
+        } catch {
+            model.present(error)
+            return false
+        }
+    }
+
+    /// A dropped URL vanishes into a folder the user cannot see from here, so
+    /// the icon acknowledges it briefly — quieter than an alert, and enough to
+    /// tell "saved" from "nothing happened".
+    private func confirmDrop() {
+        statusItem.button?.image = NSImage(
+            systemSymbolName: "checkmark.circle.fill", accessibilityDescription: "Saved")
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            self?.statusItem.button?.image = Self.defaultImage
+        }
     }
 
     // MARK: - Building
@@ -100,6 +135,20 @@ final class StatusItemController: NSObject {
         alternate.keyEquivalentModifierMask = .option
         alternate.isAlternate = true
         menu.addItem(alternate)
+
+        // A second alternate on Command: the file behind an entry has to be
+        // reachable, since the filesystem is where the shelf is actually edited.
+        let reveal = NSMenuItem(
+            title: "\(name) (Reveal in Finder)",
+            action: #selector(revealInFinder(_:)),
+            keyEquivalent: "")
+        reveal.target = self
+        reveal.representedObject = EntryTarget(
+            fileURL: fileURL, folderURL: folder, useInverted: false)
+        reveal.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
+        reveal.keyEquivalentModifierMask = .command
+        reveal.isAlternate = true
+        menu.addItem(reveal)
     }
 
     private func entryItem(
@@ -149,64 +198,30 @@ final class StatusItemController: NSObject {
         }
     }
 
-    /// Browser pickers live in the menu because a disabled private entry is
-    /// otherwise a dead end: the reason it is disabled and the place to fix it
-    /// have to be reachable from the same click.
-    private func browserMenuItem(title: String, mode: OpenMode) -> NSMenuItem {
-        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
-        let submenu = NSMenu(title: title)
+    /// The private browser is the one setting worth switching from the menu:
+    /// which browser an investigation should be isolated in changes with the
+    /// task, while the root and the normal browser are set once (in Settings).
+    private func privateBrowserMenuItem() -> NSMenuItem {
+        let item = NSMenuItem(title: "Private Browser", action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: item.title)
 
-        if mode == .normal {
-            let systemDefault = NSMenuItem(
-                title: "System Default",
-                action: #selector(selectNormalBrowser(_:)),
-                keyEquivalent: "")
-            systemDefault.target = self
-            systemDefault.representedObject = BrowserSelection.systemDefault.configValue
-            systemDefault.state = model.config.normalBrowser == .systemDefault ? .on : .off
-            submenu.addItem(systemDefault)
-            submenu.addItem(.separator())
-        }
-
-        let candidates = mode == .normal
-            ? model.inventory.installedBrowsers()
-            : model.inventory.privateCapableBrowsers()
-
+        let candidates = model.inventory.privateCapableBrowsers()
         if candidates.isEmpty {
             submenu.addItem(disabledItem("No capable browser installed"))
         }
-
         for capability in candidates {
             let entry = NSMenuItem(
                 title: capability.displayName,
-                action: mode == .normal
-                    ? #selector(selectNormalBrowser(_:))
-                    : #selector(selectPrivateBrowser(_:)),
+                action: #selector(selectPrivateBrowser(_:)),
                 keyEquivalent: "")
             entry.target = self
             entry.representedObject = capability.bundleID
-            entry.state = isSelected(capability.bundleID, for: mode) ? .on : .off
+            entry.state = model.config.privateBrowser == capability.bundleID ? .on : .off
             submenu.addItem(entry)
         }
 
         item.submenu = submenu
         return item
-    }
-
-    private func isSelected(_ bundleID: String, for mode: OpenMode) -> Bool {
-        switch mode {
-        case .normal: return model.config.normalBrowser == .bundleID(bundleID)
-        case .privateWindow: return model.config.privateBrowser == bundleID
-        }
-    }
-
-    @objc private func selectNormalBrowser(_ sender: NSMenuItem) {
-        guard let value = sender.representedObject as? String else { return }
-        do {
-            try model.setNormalBrowser(BrowserSelection(configValue: value))
-        } catch {
-            model.present(error)
-        }
     }
 
     @objc private func selectPrivateBrowser(_ sender: NSMenuItem) {
@@ -218,21 +233,24 @@ final class StatusItemController: NSObject {
         }
     }
 
-    @objc private func chooseShelfFolder() {
-        let panel = NSOpenPanel()
-        panel.canChooseFiles = false
-        panel.canChooseDirectories = true
-        panel.allowsMultipleSelection = false
-        panel.prompt = "Choose"
-        panel.message = "Choose the folder that holds your .webloc files."
+    @objc private func openSettings() {
+        settings.show()
+    }
 
+    @objc private func openAbout() {
+        NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
-        guard panel.runModal() == .OK, let url = panel.url else { return }
-        do {
-            try model.setRoot(url)
-        } catch {
-            model.present(error)
-        }
+        NSApp.orderFrontStandardAboutPanel(nil)
+    }
+
+    @objc private func openShelfFolder(_ sender: NSMenuItem) {
+        guard let url = sender.representedObject as? URL else { return }
+        NSWorkspace.shared.open(url)
+    }
+
+    @objc private func revealInFinder(_ sender: NSMenuItem) {
+        guard let target = sender.representedObject as? EntryTarget else { return }
+        NSWorkspace.shared.activateFileViewerSelecting([target.fileURL])
     }
 }
 
@@ -259,7 +277,9 @@ extension StatusItemController: NSMenuDelegate {
 
         // Stated inline, not just as a tooltip: a disabled entry with no visible
         // explanation reads as a broken app rather than as a setting to make.
-        if model.needsPrivateBrowserChoice {
+        if model.rootURL == nil {
+            menu.addItem(disabledItem("Choose a shelf folder in Settings to begin"))
+        } else if model.needsPrivateBrowserChoice {
             menu.addItem(disabledItem("Private entries need a browser — choose one below"))
         } else if model.inventory.privateCapableBrowsers().isEmpty {
             let warning = disabledItem("No private-capable browser installed")
@@ -268,15 +288,30 @@ extension StatusItemController: NSMenuDelegate {
             menu.addItem(warning)
         }
 
-        let choose = NSMenuItem(
-            title: "Choose Shelf Folder…", action: #selector(chooseShelfFolder), keyEquivalent: "")
-        choose.target = self
-        menu.addItem(choose)
-        menu.addItem(browserMenuItem(title: "Normal Browser", mode: .normal))
-        menu.addItem(browserMenuItem(title: "Private Browser", mode: .privateWindow))
+        menu.addItem(privateBrowserMenuItem())
+
+        if let root = model.rootURL {
+            let reveal = NSMenuItem(
+                title: "Open Shelf Folder in Finder",
+                action: #selector(openShelfFolder),
+                keyEquivalent: "")
+            reveal.target = self
+            reveal.representedObject = root
+            menu.addItem(reveal)
+        }
+
+        let settingsItem = NSMenuItem(
+            title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
+        settingsItem.target = self
+        menu.addItem(settingsItem)
 
         menu.addItem(.separator())
-        menu.addItem(disabledItem("URL Shelf \(AppInfo.version)"))
+        let about = NSMenuItem(
+            title: "About URL Shelf \(AppInfo.version)",
+            action: #selector(openAbout),
+            keyEquivalent: "")
+        about.target = self
+        menu.addItem(about)
         menu.addItem(NSMenuItem(
             title: "Quit",
             action: #selector(NSApplication.terminate(_:)),

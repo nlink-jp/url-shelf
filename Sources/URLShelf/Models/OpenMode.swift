@@ -8,7 +8,7 @@ enum OpenMode: String, Equatable, CaseIterable {
 
 /// Which browser to use. `systemDefault` hands the URL to LaunchServices, so it
 /// follows whatever the user sets as their default browser.
-enum BrowserSelection: Equatable {
+enum BrowserSelection: Equatable, Hashable {
     case systemDefault
     case bundleID(String)
 

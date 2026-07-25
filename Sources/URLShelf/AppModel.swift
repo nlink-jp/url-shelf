@@ -3,23 +3,26 @@ import AppKit
 /// Everything the menu needs, with the OS behind protocols so the logic stays
 /// testable.
 @MainActor
-final class AppModel {
-    private(set) var config: AppConfig
+final class AppModel: ObservableObject {
+    @Published private(set) var config: AppConfig
     private let configURL: URL
     let shelf: ShelfReading
     let inventory: BrowserInventory
     let launcher: BrowserLaunching
+    let loginItem: LoginItemManaging
 
     init(
         configURL: URL = AppConfig.defaultFileURL(),
         shelf: ShelfReading = FileSystemShelf(),
         inventory: BrowserInventory = WorkspaceBrowserInventory(),
-        launcher: BrowserLaunching = WorkspaceBrowserLauncher()
+        launcher: BrowserLaunching = WorkspaceBrowserLauncher(),
+        loginItem: LoginItemManaging = SMAppServiceLoginItem()
     ) {
         self.configURL = configURL
         self.shelf = shelf
         self.inventory = inventory
         self.launcher = launcher
+        self.loginItem = loginItem
         config = AppConfig.read(contentsOf: configURL)
     }
 
@@ -33,6 +36,11 @@ final class AppModel {
 
     func setRoot(_ url: URL) throws {
         config.rootPath = url.path
+        try config.write(to: configURL)
+    }
+
+    func setInbox(_ path: String) throws {
+        config.inbox = path
         try config.write(to: configURL)
     }
 
@@ -96,6 +104,59 @@ final class AppModel {
             return config.privateBrowser.map(BrowserSelection.bundleID) ?? .systemDefault
         }
     }
+
+    // MARK: - Creating entries
+
+    /// Where a dropped URL lands: the configured inbox, or the root itself.
+    func inboxURL() throws -> URL {
+        guard let root = rootURL else { throw ShelfError.noRootConfigured }
+        let trimmed = config.inbox.trimmingCharacters(in: .whitespaces)
+        guard !trimmed.isEmpty else { return root }
+
+        let inbox = root.appendingPathComponent(trimmed)
+        try FileManager.default.createDirectory(at: inbox, withIntermediateDirectories: true)
+        return inbox
+    }
+
+    @discardableResult
+    func addEntry(
+        url: URL,
+        name: String? = nil,
+        in folder: URL,
+        openMode: OpenMode? = nil,
+        browserBundleID: String? = nil
+    ) throws -> URL {
+        let base = EntryNaming.filename(for: url, preferred: name)
+        let fileURL = EntryNaming.uniqueURL(in: folder, base: base, extension: "webloc")
+        try WeblocFile(url: url, openMode: openMode, browserBundleID: browserBundleID)
+            .write(to: fileURL)
+        return fileURL
+    }
+
+    /// Every folder under the root, depth-first, for the destination picker.
+    /// Returned paths are relative to the root; the root itself is `""`.
+    func folderPaths() -> [String] {
+        guard let root = rootURL else { return [] }
+        var paths = [""]
+
+        func walk(_ folder: URL, prefix: String) {
+            let children = (try? shelf.children(of: folder)) ?? []
+            for case .folder(let name, let url) in children {
+                let path = prefix.isEmpty ? name : "\(prefix)/\(name)"
+                paths.append(path)
+                walk(url, prefix: path)
+            }
+        }
+        walk(root, prefix: "")
+        return paths
+    }
+
+    func url(forFolderPath path: String) -> URL? {
+        guard let root = rootURL else { return nil }
+        return path.isEmpty ? root : root.appendingPathComponent(path)
+    }
+
+    // MARK: - Launching
 
     func run(_ action: LaunchAction) {
         do {
