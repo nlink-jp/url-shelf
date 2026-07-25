@@ -88,7 +88,7 @@ struct AddEntryView: View {
     private func prefillFromClipboard() {
         guard urlText.isEmpty,
               let text = NSPasteboard.general.string(forType: .string),
-              let url = URLDropView.webURL(fromText: text)
+              let url = WebURL.parse(text)
         else { return }
         urlText = url.absoluteString
     }

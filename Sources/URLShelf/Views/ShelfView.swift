@@ -13,6 +13,7 @@ struct ShelfView: View {
     @State private var selection: String?
     @State private var errorMessage: String?
     @State private var pendingDeletion: ShelfNode?
+    @State private var dropTarget: String?
 
     var body: some View {
         HSplitView {
@@ -40,10 +41,7 @@ struct ShelfView: View {
             if let tree = model.tree() {
                 List(selection: $selection) {
                     OutlineGroup([tree], children: \.children) { node in
-                        Label(
-                            node.name,
-                            systemImage: node.isFolder ? "folder" : "globe")
-                            .tag(node.id)
+                        row(for: node)
                     }
                 }
                 .listStyle(.sidebar)
@@ -79,6 +77,59 @@ struct ShelfView: View {
             .buttonStyle(.borderless)
             .padding(8)
         }
+    }
+
+    /// Rows are draggable, folders are drop targets. Dropping is only a *move*
+    /// between folders — reordering within one would mean renumbering filename
+    /// prefixes, which ADR-0001 deliberately left out.
+    @ViewBuilder
+    private func row(for node: ShelfNode) -> some View {
+        let label = Label(node.name, systemImage: node.isFolder ? "folder" : "globe")
+            .tag(node.id)
+            .draggable(node.url)
+
+        if node.isFolder {
+            label
+                .background(dropTarget == node.id ? Color.accentColor.opacity(0.25) : .clear)
+                .dropDestination(for: URL.self) { urls, _ in
+                    accept(urls, into: node)
+                } isTargeted: { targeted in
+                    dropTarget = targeted ? node.id : nil
+                }
+        } else {
+            label
+        }
+    }
+
+    private func accept(_ urls: [URL], into folder: ShelfNode) -> Bool {
+        guard let root = model.rootURL else { return false }
+        var handled = false
+
+        for url in urls {
+            switch DropRouter.action(for: url, into: folder.url, shelfRoot: root) {
+            case .move(let source):
+                do {
+                    let moved = try model.move(source, to: folder.url)
+                    selection = moved.path
+                    errorMessage = nil
+                    handled = true
+                } catch {
+                    errorMessage = AppModel.describe(error)
+                }
+            case .addEntry(let webURL):
+                do {
+                    let added = try model.addEntry(url: webURL, in: folder.url)
+                    selection = added.path
+                    errorMessage = nil
+                    handled = true
+                } catch {
+                    errorMessage = AppModel.describe(error)
+                }
+            case .reject:
+                continue
+            }
+        }
+        return handled
     }
 
     // MARK: - Inspector

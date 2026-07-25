@@ -29,7 +29,8 @@ the same screen once that editor exists.
 - Entry inspector: display name, URL, containing folder, open mode, browser
 - Folder inspector: display name, containing folder, `.url-shelf.toml` defaults
 - Changes apply immediately (no Save button); text fields commit on Return or focus loss
-- Relocation happens through **the inspector's folder picker**, not drag and drop
+- Relocation happens by **dragging within the tree** and through the inspector's
+  folder picker (moving *between* folders is a plain file move, with no rename)
 - Deletion goes to the Trash via `FileManager.trashItem`; `unlink` is never used
 - The tree is re-read after every operation
 
@@ -38,7 +39,9 @@ from reorganizing, and a light window with a clipboard prefill is faster for it.
 
 ## Alternatives rejected or deferred
 
-**Drag to reorder (deferred).** Ordering is expressed as a numeric filename prefix,
+**Drag to reorder (deferred — distinct from moving).** Dragging between folders is
+implemented; **reordering within one folder** is the part held back. Ordering is
+expressed as a numeric filename prefix,
 so dragging to reorder means the app **mass-renames the user's files**. A bulk rename
 is costly when it goes wrong, and its behaviour when it races with hand edits in
 Finder is not obvious. Whether maintaining order by hand is actually painful is

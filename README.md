@@ -71,6 +71,8 @@ settings stored *inside* a `.webloc`.
 - **Add URL…** (Cmd-N) files a single URL, prefilled from the clipboard
 - Dropping a URL on the menu bar icon files it in the drop-target folder
 - Deleting moves to the **Trash**, so a mistake is recoverable from Finder
+- Entries and folders are **dragged between folders** in the tree; a URL dragged
+  in from a browser is filed straight into the folder it lands on
 - Renaming keeps any ordering prefix, so an entry does not jump position
 
 Changes made in Finder while the app is running are picked up automatically —

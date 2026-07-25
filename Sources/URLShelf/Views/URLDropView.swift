@@ -50,18 +50,8 @@ final class URLDropView: NSView {
             return url
         }
         if let text = pasteboard.string(forType: .string) {
-            return webURL(fromText: text)
+            return WebURL.parse(text)
         }
         return nil
-    }
-
-    static func webURL(fromText text: String) -> URL? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let url = URL(string: trimmed), let scheme = url.scheme?.lowercased() else {
-            return nil
-        }
-        // Anything the app would hand to a browser. A bare "example.com" is not
-        // accepted: guessing a scheme for a dropped fragment invites surprises.
-        return ["http", "https", "file", "ftp"].contains(scheme) ? url : nil
     }
 }

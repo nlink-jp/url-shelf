@@ -48,27 +48,26 @@ final class EntryNamingTests: XCTestCase {
     }
 }
 
-@MainActor
 final class DroppedURLTests: XCTestCase {
     func testAcceptsWebURLs() {
         XCTAssertEqual(
-            URLDropView.webURL(fromText: "  https://example.com/a  "),
+            WebURL.parse("  https://example.com/a  "),
             URL(string: "https://example.com/a"))
     }
 
     func testRejectsBareHostnames() {
         // Guessing a scheme for a dropped fragment would open something the user
         // did not point at.
-        XCTAssertNil(URLDropView.webURL(fromText: "example.com"))
+        XCTAssertNil(WebURL.parse("example.com"))
     }
 
     func testRejectsNonBrowsableSchemes() {
-        XCTAssertNil(URLDropView.webURL(fromText: "javascript:alert(1)"))
-        XCTAssertNil(URLDropView.webURL(fromText: "mailto:someone@example.com"))
+        XCTAssertNil(WebURL.parse("javascript:alert(1)"))
+        XCTAssertNil(WebURL.parse("mailto:someone@example.com"))
     }
 
     func testRejectsPlainText() {
-        XCTAssertNil(URLDropView.webURL(fromText: "just some words"))
+        XCTAssertNil(WebURL.parse("just some words"))
     }
 }
 
