@@ -49,7 +49,7 @@ English: [README.md](README.md)
 
 | ブラウザ | プライベート起動 |
 |---|---|
-| Firefox | `--private-window` |
+| Firefox | `-private-window`（ハイフン 1 個） |
 | Google Chrome | `--incognito` |
 | Microsoft Edge | `--inprivate` |
 | Safari | **非対応** |

@@ -10,7 +10,8 @@ Safari has no supported mechanism). **Apple Silicon, macOS 13+. GUI only** (no
 CLI — a deliberate departure from the util-series CLI-in-GUI convention;
 testability is covered by unit tests on the pure layers).
 
-**Status:** scaffold complete, core not yet implemented. Design of record:
+**Status:** scaffold complete, launch spike verified, core not yet implemented.
+Design of record:
 `docs/en/url-shelf-rfp.md` / `docs/ja/url-shelf-rfp.ja.md`.
 
 ## Build / test / run
@@ -71,11 +72,17 @@ Resolution order: **entry > nearest ancestor folder > global config**
   Option-key alternate items, and drag-and-drop onto the status item.
 - **Ordering-prefix stripping is capped at 3 digits** so that names starting with
   a year (`2026-07-26 notes.webloc`) are not mangled.
-- **Chromium argument forwarding is unproven** — opening a private window in an
-  *already running* Chrome/Firefox via
-  `NSWorkspace.openApplication(at:configuration:)` with `arguments` +
-  `createsNewApplicationInstance` must be verified by a spike before the
-  launcher is built. The design depends on it.
+- **Argument forwarding works, but only with `createsNewApplicationInstance = true`**
+  (measured 2026-07-26). With it, a transient process forwards the arguments to the
+  running browser and exits. With `false`, Edge opened nothing and Chrome let the URL
+  slip into whatever window was frontmost — never use `false`.
+- **Firefox takes a single dash: `-private-window`.** `--private-window` is silently
+  ignored and opens a **normal** window — the failure surfaces as the exact outcome
+  this app exists to prevent, not as an error. Never assume a flag's dash form;
+  measure it. Do not use Firefox's `-private` (an instance-wide mode switch).
+- **A URL opened without flags joins the browser's frontmost window**, which may be a
+  private one. Browser behavior, not controllable, and harmless — the dangerous
+  direction (private entry → normal window) is prevented by the flag.
 - **Safari cannot be driven into a private window** from outside. Do not add UI
   scripting (Cmd+Shift+N) as a workaround — it needs Accessibility permission and
   breaks across OS updates.

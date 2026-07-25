@@ -23,6 +23,12 @@ GUI only** (no CLI, deliberately).
   config.** Do not add a fourth layer.
 - **Browsers are identified by bundle ID everywhere** (config, folder defaults,
   webloc keys). Display names are presentation only.
+- **Launch with `createsNewApplicationInstance = true`, always.** With `false` the
+  flags do not reliably reach the browser.
+- **Never guess a private-mode flag — measure it.** Firefox takes a single dash
+  (`-private-window`); the GNU-style `--private-window` is silently ignored and opens
+  a normal window. A wrong flag fails as "opened in the normal session", not as an
+  error, so every table entry needs a real launch behind it.
 - **Never fall back from private to normal.** If private launching is
   unavailable, disable the item and say why. Opening a private-marked URL in the
   normal session is the one failure this tool exists to prevent.

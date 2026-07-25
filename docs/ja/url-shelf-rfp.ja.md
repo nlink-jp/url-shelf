@@ -120,14 +120,21 @@ browser = "org.mozilla.firefox"
 
 **ブラウザ対応表**（インストール済みのものだけ設定 UI に列挙する）
 
-| bundle ID | プライベート起動フラグ |
-|---|---|
-| `org.mozilla.firefox` | `--private-window` |
-| `com.google.Chrome` | `--incognito` |
-| `com.microsoft.edgemac` | `--inprivate` |
-| `com.apple.Safari` | 非対応（通常モードのみ） |
+| bundle ID | プライベート起動フラグ | 実測 |
+|---|---|---|
+| `org.mozilla.firefox` | `-private-window`（**ハイフン 1 個**） | 起動中インスタンスで確認 |
+| `com.google.Chrome` | `--incognito` | コールド・起動中とも確認 |
+| `com.microsoft.edgemac` | `--inprivate` | コールド・起動中とも確認 |
+| `com.apple.Safari` | 非対応（通常モードのみ） | — |
 
-Brave / Vivaldi など他の Chromium 系は、この表に 1 行追加するだけで対応できる構造にする。
+Firefox だけ Mozilla 形式の単一ハイフンである点は実測に基づく（後述の spike 結果）。
+GNU 形式の `--private-window` は**黙って無視され通常ウィンドウで開く**ため、対応表は
+「Chromium 系は `--`、Firefox は `-`」という差をそのまま保持する。Brave / Vivaldi など
+他の Chromium 系は、この表に 1 行追加するだけで対応できる構造にする。
+
+**起動方式**: `NSWorkspace.OpenConfiguration.createsNewApplicationInstance` は
+**常に true**（`open -na` 相当）。false ではフラグが届かず、URL が最前面のウィンドウに
+紛れ込むか、何も起きない。
 
 ## 3. Design Decisions
 
@@ -180,11 +187,12 @@ whois-lookup / doh-lookup 等）と併用されることを想定するが、ツ
 OS 依存は protocol の背後（`BrowserLauncher` / `BrowserInventory` / `ShelfStore`）に
 隔離してモック可能にし、テストは純関数部分に集中させる。
 
-**着手直後に spike（最優先）**: `NSWorkspace.openApplication(at:configuration:)` に
-`arguments` と `createsNewApplicationInstance` を渡して、既に起動中の Chrome / Firefox に
-プライベートウィンドウを開かせられるかを実証する。ここが崩れると設計の前提が変わるため、
-他の実装より先に潰す。同時に、独自キーを持つ `.webloc` を Finder / LaunchServices が
-問題なく開けることも確認する。
+**spike 完了（2026-07-26）**: `NSWorkspace.openApplication(at:configuration:)` +
+`arguments` + `createsNewApplicationInstance = true` で、**起動中の Firefox / Chrome /
+Edge にプライベートウィンドウを開かせられることを実測で確認**した。設計の前提は成立する。
+判明した差分（Firefox は単一ハイフン、`createsNewApplicationInstance` は常に true）は
+上記の対応表と §7 に反映済み。独自キーを持つ `.webloc` も Finder / LaunchServices が
+問題なく開くことを確認した。
 
 ### Phase 2: Features
 
@@ -241,10 +249,21 @@ Reason: URL の分類・保管・起動という汎用的なローカルユー�
   しない。UI スクリプティング（Cmd+Shift+N）は Accessibility 権限が必要な上に OS 更新で
   壊れるため採用しない。設計上の恒久的制約として受け入れ、Safari は「通常 URL の開き方」
   でのみ選択可能とする
-- **Chromium 系の singleton 挙動** — 起動済みインスタンスへの引数転送に依存する。
-  Phase 1 の spike で実証必須
-- **`.webloc` の独自キー許容** — Finder / LaunchServices が未知のキーを無視することに
-  依存する。spike で `URL` キーのみが読まれることを確認する
+- **引数転送は実証済み** — Firefox / Chrome / Edge のいずれも、起動中インスタンスがある
+  状態で `createsNewApplicationInstance = true` を渡すと一時プロセスが起動して既存プロセスへ
+  引数を転送し、直後に終了する（元の pid が生存）。`open -na` と同じ挙動
+- **`createsNewApplicationInstance = false` は使えない** — Edge では何も開かず、Chrome では
+  URL が最前面のウィンドウに紛れ込んだ。フラグが確実に届く保証がないため常に true とする
+- **Firefox のフラグは単一ハイフン** — `-private-window` は成功、`--private-window` は
+  **黙って無視され通常ウィンドウで開く**。誤りが例外にならず「通常セッションで開く」という
+  最悪の形で現れるため、対応表の値は実測でのみ確定させる
+- **Firefox の `-private` は使わない** — プライベートウィンドウは開くが、これはインスタンス
+  全体のモード指定であり `-private-window` とは意味が異なる
+- **URL は最前面のウィンドウに入る** — フラグ無しで開いた URL は、そのブラウザの最前面が
+  プライベートウィンドウならその中のタブとして開く。ブラウザ側の仕様であり制御できない。
+  逆方向（プライベート指定が通常ウィンドウに落ちる）はフラグにより防止される
+- **`.webloc` の独自キーは安全** — 独自キーを足しても `plutil -lint` は OK、UTI は
+  `com.apple.web-internet-location` のまま、`open` は既定ブラウザで URL を開く（通常モード）
 - **macOS 13+ / darwin・arm64 専用** — SMAppService の要件による
 - **Gatekeeper** — notarize + staple 必須。Homebrew tap は prebuilt binary 方式で
   署名を保持する
@@ -290,6 +309,15 @@ Vivaldi も 1 行追加で対応できる。
 **命名**: `site-shelf` / `url-binder` / `url-shelf` を比較。`binder` は data binding /
 key binding との連想で二義的になるため、「並べておいて必要なものを取り出す」動作が
 UI と一致する `url-shelf` を採用した。
+
+**spike 結果（2026-07-26）**: 設計の前提だった「起動中のブラウザにプライベートウィンドウを
+開かせられるか」を実測。Chrome `--incognito` と Edge `--inprivate` はコールド・起動中とも成功。
+Firefox は **`--private-window`（ハイフン 2 個）が黙って無視され通常ウィンドウで開く**という
+最も危険な失敗をし、**`-private-window`（ハイフン 1 個）で成功**した。ここから
+「対応表の値は推測せず実測でのみ確定させる」を設計原則に追加した。また
+`createsNewApplicationInstance = false` は Edge で無反応・Chrome で URL が最前面ウィンドウに
+紛れ込んだため、**常に true**（`open -na` 相当）とする。`.webloc` の独自キーは
+`plutil -lint` OK・UTI 不変・`open` で通常どおり開くことを確認し、Finder 互換の前提も成立した。
 
 **その他の確定事項**: ルートフォルダは単一（複数持ちたければ親フォルダをルートにすれば
 済む）、設定は `~/.config/url-shelf/config.toml`（org 規約準拠・可視・grep 可能）、

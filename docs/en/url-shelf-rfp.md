@@ -128,14 +128,23 @@ credential, or cloud service.
 
 **Browser capability table** (only installed entries are listed in the settings UI)
 
-| bundle ID | private-window flag |
-|---|---|
-| `org.mozilla.firefox` | `--private-window` |
-| `com.google.Chrome` | `--incognito` |
-| `com.microsoft.edgemac` | `--inprivate` |
-| `com.apple.Safari` | not supported (normal mode only) |
+| bundle ID | private-window flag | measured |
+|---|---|---|
+| `org.mozilla.firefox` | `-private-window` (**single dash**) | verified against a running instance |
+| `com.google.Chrome` | `--incognito` | verified cold and running |
+| `com.microsoft.edgemac` | `--inprivate` | verified cold and running |
+| `com.apple.Safari` | not supported (normal mode only) | — |
 
-Other Chromium-based browsers (Brave, Vivaldi) must be addable with a single row.
+Firefox alone takes the Mozilla-style single dash; this is measured, not assumed
+(see the spike results). The GNU-style `--private-window` is **silently ignored and
+opens a normal window**, so the table deliberately preserves the `--` / `-`
+difference. Other Chromium-based browsers (Brave, Vivaldi) must be addable with a
+single row.
+
+**Launch mechanism**: `NSWorkspace.OpenConfiguration.createsNewApplicationInstance`
+is **always true** (the `open -na` equivalent). With false the flags do not reach
+the browser — the URL either slips into whatever window is frontmost or nothing
+happens at all.
 
 ## 3. Design Decisions
 
@@ -190,12 +199,13 @@ OS dependencies are isolated behind protocols (`BrowserLauncher`,
 `BrowserInventory`, `ShelfStore`) so they can be mocked; tests concentrate on the
 pure functions.
 
-**Spike first (highest priority)**: prove that
-`NSWorkspace.openApplication(at:configuration:)` with `arguments` and
-`createsNewApplicationInstance` can make an already-running Chrome or Firefox open a
-private window. If this fails, the design's premise changes, so it is settled before
-any other implementation. The same spike confirms that Finder and LaunchServices
-handle `.webloc` files carrying custom keys.
+**Spike completed (2026-07-26)**: `NSWorkspace.openApplication(at:configuration:)`
+with `arguments` and `createsNewApplicationInstance = true` **was measured to open a
+private window in an already-running Firefox, Chrome, and Edge**. The design's
+premise holds. The differences found (Firefox takes a single dash;
+`createsNewApplicationInstance` must always be true) are reflected in the capability
+table above and in §7. Finder and LaunchServices were also confirmed to handle
+`.webloc` files carrying custom keys.
 
 ### Phase 2: Features
 
@@ -253,10 +263,26 @@ GUIs (share-mounter, quick-translate, instant-translate, load-spinner).
   option, no URL scheme. UI scripting (Cmd+Shift+N) needs Accessibility permission
   and breaks across OS updates, so it is not adopted. Accepted as a permanent design
   constraint; Safari remains selectable only for normal URLs
-- **Chromium singleton behavior** — the design depends on argument forwarding to an
-  already-running instance. Must be proven by the Phase 1 spike
-- **Custom keys in `.webloc`** — depends on Finder and LaunchServices ignoring
-  unknown keys. The spike confirms only the `URL` key is consumed
+- **Argument forwarding is proven** — for Firefox, Chrome, and Edge alike, passing
+  `createsNewApplicationInstance = true` while an instance is running spawns a
+  transient process that forwards the arguments to the existing one and exits
+  immediately (the original pid survives). Same behavior as `open -na`
+- **`createsNewApplicationInstance = false` is unusable** — Edge opened nothing;
+  Chrome let the URL slip into whatever window was frontmost. There is no guarantee
+  the flags arrive, so it is always true
+- **Firefox takes a single dash** — `-private-window` works; `--private-window` is
+  **silently ignored and opens a normal window**. The mistake does not surface as an
+  error but as the worst possible outcome (opening in the normal session), so
+  capability-table values are only ever settled by measurement
+- **Do not use Firefox's `-private`** — it does open a private window, but it is an
+  instance-wide mode switch, not the same thing as `-private-window`
+- **URLs land in the frontmost window** — a URL opened without flags joins the
+  browser's frontmost window, which may be a private one, as a tab. That is browser
+  behavior and is not controllable. The reverse direction (a private entry landing in
+  a normal window) is prevented by the flag
+- **Custom keys in `.webloc` are safe** — with custom keys added, `plutil -lint`
+  passes, the UTI stays `com.apple.web-internet-location`, and `open` hands the URL
+  to the default browser (in normal mode)
 - **macOS 13+, darwin/arm64 only** — driven by the SMAppService requirement
 - **Gatekeeper** — notarization and stapling are mandatory; the Homebrew tap uses the
   prebuilt-binary form to preserve the signature
@@ -304,6 +330,18 @@ paths.
 **Naming**: compared `site-shelf`, `url-binder`, and `url-shelf`. "binder" is
 ambiguous against data binding and key binding, whereas "shelf" matches the actual
 interaction — things are lined up and picked off. `url-shelf` was chosen.
+
+**Spike results (2026-07-26)**: the design's premise — that an already-running
+browser can be driven into a private window — was measured. Chrome `--incognito` and
+Edge `--inprivate` succeeded both cold and running. Firefox failed in the most
+dangerous way possible with `--private-window` (two dashes): **silently ignored, the
+URL opened in a normal window**, and succeeded with `-private-window` (one dash).
+That produced an added design principle: capability-table values are settled by
+measurement, never by assumption. `createsNewApplicationInstance = false` was also
+ruled out (Edge did nothing; Chrome let the URL slip into the frontmost window), so
+it is **always true** (the `open -na` equivalent). Custom keys in a `.webloc` passed
+`plutil -lint`, left the UTI unchanged, and opened normally via `open`, confirming
+the Finder-compatibility premise.
 
 **Other settled points**: a single root folder (nesting under a common parent covers
 multiple trees), configuration at `~/.config/url-shelf/config.toml` (org convention,

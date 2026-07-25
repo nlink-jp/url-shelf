@@ -50,7 +50,7 @@ namespace, so the file stays a valid web location:
 
 | Browser | Private launch |
 |---|---|
-| Firefox | `--private-window` |
+| Firefox | `-private-window` (single dash) |
 | Google Chrome | `--incognito` |
 | Microsoft Edge | `--inprivate` |
 | Safari | **not supported** |
