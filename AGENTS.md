@@ -10,8 +10,8 @@ Safari has no supported mechanism). **Apple Silicon, macOS 13+. GUI only** (no
 CLI — a deliberate departure from the util-series CLI-in-GUI convention;
 testability is covered by unit tests on the pure layers).
 
-**Status:** scaffold complete, launch spike verified, core not yet implemented.
-Design of record:
+**Status:** in development. Reading, launching, and shelf editing work; not yet
+packaged or released. Design of record:
 `docs/en/url-shelf-rfp.md` / `docs/ja/url-shelf-rfp.ja.md`.
 
 ## Build / test / run
@@ -41,19 +41,34 @@ Makefile                        build / build-app / package / brew
 scripts/                        codesign + notarize + cask generation (vendored from .github/templates)
 Sources/URLShelf/
   App.swift                     @main (AppKit entry, .accessory policy) + AppDelegate + AppInfo.version
+  AppModel.swift                @MainActor orchestrator; config, plans, shelf mutations
   StatusItemController.swift    NSStatusItem + NSMenu; rebuilds the menu in menuNeedsUpdate
   Models/
-    DisplayName.swift           filename → menu label (drops extension + ordering prefix)
-Tests/URLShelfTests/
-  DisplayNameTests.swift
-docs/{en,ja}/                   RFP
+    DisplayName.swift           filename ⇄ menu label (ordering prefix, rename)
+    EntryNaming.swift           filename choice, sanitizing, collision counter
+    OpenMode.swift              OpenMode / BrowserSelection / webloc key names
+    WeblocFile.swift            plist read/write, foreign keys preserved
+    FolderDefaults.swift        .url-shelf.toml model
+    AppConfig.swift             ~/.config/url-shelf/config.toml model
+  Services/
+    ShelfStore.swift            FileSystemShelf: one-level walk, defaults chain, full tree
+    ShelfEditor.swift           create/rename/move/trash behind ShelfEditing
+    MetadataResolver.swift      entry > nearest folder > global config
+    LaunchPlanner.swift         resolved plan → LaunchAction, by table lookup
+    BrowserCatalog.swift        measured private-flag table + installed-browser filter
+    BrowserLauncher.swift       NSWorkspace launch + LaunchServices inventory
+    LoginItemManager.swift      SMAppService
+    MiniTOML.swift              the TOML subset the config files need
+  Views/
+    HostedWindow.swift          NSWindow + NSHostingView host; activation-policy counting
+    SettingsView.swift          configuration only
+    AddEntryView.swift          quick capture, clipboard prefill
+    ShelfView.swift             tree + inspector (the editor)
+    URLDropView.swift           drop target overlaid on the status item button
+Tests/URLShelfTests/            unit tests for every pure layer
+spikes/launch-probe.swift       browser private-launch harness (see Gotchas)
+docs/{en,ja}/                   RFP + ADR-0001
 ```
-
-Planned additions (Phase 1 of the development plan): `Models/ShelfEntry`,
-`Models/FolderDefaults`, `Services/ShelfStore` (webloc read/write + tree walk),
-`Services/BrowserInventory` (installed browsers × private-flag table),
-`Services/BrowserLauncher` (`NSWorkspace`), `Services/Config` (`config.toml`),
-`Views/SettingsView`.
 
 ## Data model
 

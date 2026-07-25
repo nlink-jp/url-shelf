@@ -22,10 +22,15 @@ enum DisplayName {
     /// Returns the input unchanged when the result would be empty or when the
     /// digit run is too long to be a sort key.
     static func strippingOrderPrefix(_ stem: String) -> String {
+        String(stem.dropFirst(orderPrefix(of: stem).count))
+    }
+
+    /// The leading `<digits><separator(s)>` run, or `""` when there is none.
+    static func orderPrefix(of stem: String) -> String {
         var rest = Substring(stem)
 
         let digits = rest.prefix(while: \.isNumber)
-        guard !digits.isEmpty, digits.count <= maxPrefixDigits else { return stem }
+        guard !digits.isEmpty, digits.count <= maxPrefixDigits else { return "" }
         rest = rest.dropFirst(digits.count)
 
         var separatorCount = 0
@@ -34,7 +39,19 @@ enum DisplayName {
             separatorCount += 1
         }
 
-        guard separatorCount > 0, !rest.isEmpty else { return stem }
-        return String(rest)
+        guard separatorCount > 0, !rest.isEmpty else { return "" }
+        return String(stem.dropLast(rest.count))
+    }
+
+    /// The filename for `newDisplayName`, keeping whatever ordering prefix and
+    /// extension the old filename had.
+    ///
+    /// Renaming must not silently move an entry to a different position in the
+    /// menu — the prefix is the user's ordering, not part of the name.
+    static func renamedFilename(_ filename: String, to newDisplayName: String) -> String {
+        let stem = (filename as NSString).deletingPathExtension
+        let pathExtension = (filename as NSString).pathExtension
+        let renamed = orderPrefix(of: stem) + EntryNaming.sanitize(newDisplayName)
+        return pathExtension.isEmpty ? renamed : "\(renamed).\(pathExtension)"
     }
 }

@@ -70,7 +70,39 @@ struct FileSystemShelf: ShelfReading {
     }
 }
 
+/// The whole shelf, for the editor. The menu never builds one of these — it
+/// expands one level at a time — but reorganizing means seeing the structure.
+struct ShelfNode: Identifiable, Equatable {
+    let url: URL
+    let name: String
+    let isFolder: Bool
+    /// `nil` for entries; folders always have an array, empty when they have no
+    /// children, so the tree view can tell "leaf" from "empty folder".
+    var children: [ShelfNode]?
+
+    var id: String { url.path }
+}
+
 extension ShelfReading {
+    /// Depth is capped because a symlink can point back up the tree, and the
+    /// shelf is a user-arranged folder that may contain anything.
+    func tree(at root: URL, name: String? = nil, maxDepth: Int = 12) -> ShelfNode {
+        let displayName = name ?? DisplayName.fromFilename(root.lastPathComponent)
+        guard maxDepth > 0 else {
+            return ShelfNode(url: root, name: displayName, isFolder: true, children: [])
+        }
+
+        let children = ((try? children(of: root)) ?? []).map { item -> ShelfNode in
+            switch item {
+            case .folder(let name, let url):
+                return tree(at: url, name: name, maxDepth: maxDepth - 1)
+            case .entry(let name, let fileURL):
+                return ShelfNode(url: fileURL, name: name, isFolder: false, children: nil)
+            }
+        }
+        return ShelfNode(url: root, name: displayName, isFolder: true, children: children)
+    }
+
     /// Folder defaults from `root` down to `folder`, root first, so that the
     /// nearest ancestor is last and therefore wins.
     ///

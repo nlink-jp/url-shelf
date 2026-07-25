@@ -10,19 +10,22 @@ final class AppModel: ObservableObject {
     let inventory: BrowserInventory
     let launcher: BrowserLaunching
     let loginItem: LoginItemManaging
+    let editor: ShelfEditing
 
     init(
         configURL: URL = AppConfig.defaultFileURL(),
         shelf: ShelfReading = FileSystemShelf(),
         inventory: BrowserInventory = WorkspaceBrowserInventory(),
         launcher: BrowserLaunching = WorkspaceBrowserLauncher(),
-        loginItem: LoginItemManaging = SMAppServiceLoginItem()
+        loginItem: LoginItemManaging = SMAppServiceLoginItem(),
+        editor: ShelfEditing = FileSystemShelfEditor()
     ) {
         self.configURL = configURL
         self.shelf = shelf
         self.inventory = inventory
         self.launcher = launcher
         self.loginItem = loginItem
+        self.editor = editor
         config = AppConfig.read(contentsOf: configURL)
     }
 
@@ -130,6 +133,7 @@ final class AppModel: ObservableObject {
         let fileURL = EntryNaming.uniqueURL(in: folder, base: base, extension: "webloc")
         try WeblocFile(url: url, openMode: openMode, browserBundleID: browserBundleID)
             .write(to: fileURL)
+        didChangeShelf()
         return fileURL
     }
 
@@ -154,6 +158,79 @@ final class AppModel: ObservableObject {
     func url(forFolderPath path: String) -> URL? {
         guard let root = rootURL else { return nil }
         return path.isEmpty ? root : root.appendingPathComponent(path)
+    }
+
+    // MARK: - Editing the shelf
+
+    /// Bumped after every mutation so views reload the tree. The filesystem is
+    /// still the only source of truth — this is a "look again" signal, not state.
+    @Published private(set) var revision = 0
+
+    func tree() -> ShelfNode? {
+        rootURL.map { shelf.tree(at: $0, name: "Shelf") }
+    }
+
+    func entry(at fileURL: URL) throws -> WeblocFile {
+        try WeblocFile.read(contentsOf: fileURL)
+    }
+
+    func folderDefaults(at folder: URL) -> FolderDefaults {
+        shelf.defaults(at: folder)
+    }
+
+    func updateEntry(
+        at fileURL: URL,
+        url: URL? = nil,
+        openMode: OpenMode?? = nil,
+        browserBundleID: String?? = nil
+    ) throws {
+        var entry = try WeblocFile.read(contentsOf: fileURL)
+        if let url { entry.url = url }
+        if let openMode { entry.openMode = openMode }
+        if let browserBundleID { entry.browserBundleID = browserBundleID }
+        try entry.write(to: fileURL)
+        didChangeShelf()
+    }
+
+    /// Writing empty defaults removes the file rather than leaving an inert one:
+    /// the shelf should not accumulate files that say nothing.
+    func setFolderDefaults(_ defaults: FolderDefaults, at folder: URL) throws {
+        let fileURL = folder.appendingPathComponent(FolderDefaults.filename)
+        if defaults.isEmpty {
+            if FileManager.default.fileExists(atPath: fileURL.path) {
+                try FileManager.default.removeItem(at: fileURL)
+            }
+        } else {
+            try defaults.serialized().write(to: fileURL, atomically: true, encoding: .utf8)
+        }
+        didChangeShelf()
+    }
+
+    @discardableResult
+    func createFolder(named name: String, in parent: URL) throws -> URL {
+        defer { didChangeShelf() }
+        return try editor.createFolder(named: name, in: parent)
+    }
+
+    @discardableResult
+    func rename(_ url: URL, toDisplayName newName: String) throws -> URL {
+        defer { didChangeShelf() }
+        return try editor.rename(url, toDisplayName: newName)
+    }
+
+    @discardableResult
+    func move(_ url: URL, to destination: URL) throws -> URL {
+        defer { didChangeShelf() }
+        return try editor.move(url, to: destination)
+    }
+
+    func trash(_ url: URL) throws {
+        defer { didChangeShelf() }
+        try editor.trash(url)
+    }
+
+    private func didChangeShelf() {
+        revision += 1
     }
 
     // MARK: - Launching
