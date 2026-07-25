@@ -15,6 +15,10 @@ protocol ShelfEditing {
     @discardableResult
     func move(_ url: URL, to destination: URL) throws -> URL
     func trash(_ url: URL) throws
+    /// Renumbers a folder's filename prefixes so its contents sort in the given
+    /// order. Returns the new URL of each item, in order.
+    @discardableResult
+    func reorder(in folder: URL, to ordered: [URL]) throws -> [URL]
 }
 
 struct FileSystemShelfEditor: ShelfEditing {
@@ -66,6 +70,49 @@ struct FileSystemShelfEditor: ShelfEditing {
     /// to be recoverable the same way it would be in Finder.
     func trash(_ url: URL) throws {
         try fileManager.trashItem(at: url, resultingItemURL: nil)
+    }
+
+    /// Renaming in two phases, via hidden temporary names.
+    ///
+    /// A renumbering routinely swaps names between files (`010_A` ⇄ `020_B`), so
+    /// renaming in place would collide with a name still held by another file.
+    /// Everything moves to a temporary name first, then to its final one. If the
+    /// second phase fails, the temporaries are put back.
+    @discardableResult
+    func reorder(in folder: URL, to ordered: [URL]) throws -> [URL] {
+        let renames = try ShelfOrdering.renames(for: ordered.map(\.lastPathComponent))
+        guard !renames.isEmpty else { return ordered }
+
+        let planned = Dictionary(uniqueKeysWithValues: renames.map { ($0.from, $0.to) })
+        var staged: [(temporary: URL, final: URL, original: URL)] = []
+
+        for (index, rename) in renames.enumerated() {
+            let original = folder.appendingPathComponent(rename.from)
+            // Hidden, so a failure mid-flight leaves nothing visible in the menu.
+            let temporary = folder.appendingPathComponent(".url-shelf-reorder-\(index)")
+            try fileManager.moveItem(at: original, to: temporary)
+            staged.append((temporary, folder.appendingPathComponent(rename.to), original))
+        }
+
+        for item in staged {
+            do {
+                try fileManager.moveItem(at: item.temporary, to: item.final)
+            } catch {
+                rollback(staged)
+                throw error
+            }
+        }
+
+        return ordered.map { url in
+            planned[url.lastPathComponent]
+                .map { folder.appendingPathComponent($0) } ?? url
+        }
+    }
+
+    private func rollback(_ staged: [(temporary: URL, final: URL, original: URL)]) {
+        for item in staged where fileManager.fileExists(atPath: item.temporary.path) {
+            try? fileManager.moveItem(at: item.temporary, to: item.original)
+        }
     }
 
     private func uniqueSibling(of proposed: URL, avoiding original: URL) -> URL {

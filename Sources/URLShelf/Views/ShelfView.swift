@@ -79,57 +79,59 @@ struct ShelfView: View {
         }
     }
 
-    /// Rows are draggable, folders are drop targets. Dropping is only a *move*
-    /// between folders — reordering within one would mean renumbering filename
-    /// prefixes, which ADR-0001 deliberately left out.
-    @ViewBuilder
+    /// Rows are draggable, and every row is a drop target: the pointer's height
+    /// within the row decides between dropping *into* a folder and dropping
+    /// *next to* a row, which reorders.
     private func row(for node: ShelfNode) -> some View {
-        let label = Label(node.name, systemImage: node.isFolder ? "folder" : "globe")
-            .tag(node.id)
-            .draggable(node.url)
-
-        if node.isFolder {
-            label
-                .background(dropTarget == node.id ? Color.accentColor.opacity(0.25) : .clear)
-                .dropDestination(for: URL.self) { urls, _ in
-                    accept(urls, into: node)
-                } isTargeted: { targeted in
-                    dropTarget = targeted ? node.id : nil
-                }
-        } else {
-            label
-        }
+        ShelfRow(
+            node: node,
+            highlighted: dropTarget == node.id,
+            onTargeted: { dropTarget = $0 ? node.id : nil },
+            onDrop: { urls, point, height in accept(urls, onto: node, y: point.y, height: height) })
     }
 
-    private func accept(_ urls: [URL], into folder: ShelfNode) -> Bool {
-        guard let root = model.rootURL else { return false }
-        var handled = false
+    private func accept(_ urls: [URL], onto node: ShelfNode, y: CGFloat, height: CGFloat) -> Bool {
+        guard let root = model.rootURL, height > 0 else { return false }
 
+        // The root has no siblings to sit between, so a drop on it can only mean
+        // "into".
+        let position = node.url == root
+            ? .into
+            : DropPosition.from(relativeY: Double(y / height), isFolder: node.isFolder)
+
+        var handled = false
         for url in urls {
-            switch DropRouter.action(for: url, into: folder.url, shelfRoot: root) {
+            switch DropRouter.action(
+                for: url, onto: node.url, position: position, shelfRoot: root) {
             case .move(let source):
-                do {
-                    let moved = try model.move(source, to: folder.url)
-                    selection = moved.path
-                    errorMessage = nil
-                    handled = true
-                } catch {
-                    errorMessage = AppModel.describe(error)
-                }
+                handled = apply { try model.drop(source, position, relativeTo: node.url) } || handled
+
             case .addEntry(let webURL):
-                do {
-                    let added = try model.addEntry(url: webURL, in: folder.url)
-                    selection = added.path
-                    errorMessage = nil
-                    handled = true
-                } catch {
-                    errorMessage = AppModel.describe(error)
-                }
+                let folder = position == .into ? node.url : node.url.deletingLastPathComponent()
+                handled = apply {
+                    let added = try model.addEntry(url: webURL, in: folder)
+                    return position == .into
+                        ? added
+                        : try model.drop(added, position, relativeTo: node.url)
+                } || handled
+
             case .reject:
                 continue
             }
         }
         return handled
+    }
+
+    /// Runs a shelf mutation and follows the result with the selection.
+    private func apply(_ work: () throws -> URL) -> Bool {
+        do {
+            selection = try work().path
+            errorMessage = nil
+            return true
+        } catch {
+            errorMessage = AppModel.describe(error)
+            return false
+        }
     }
 
     // MARK: - Inspector
@@ -437,5 +439,38 @@ private struct FolderPicker: View {
             let candidate = path.isEmpty ? rootPath : "\(rootPath)/\(path)"
             return candidate != currentPath && !candidate.hasPrefix(currentPath + "/")
         }
+    }
+}
+
+/// One row of the tree.
+///
+/// The row measures itself so that a drop can be resolved to before / into /
+/// after. SwiftUI reports the pointer position only when the drop happens, not
+/// during the drag, so the highlight marks the row rather than the exact
+/// insertion point.
+private struct ShelfRow: View {
+    let node: ShelfNode
+    let highlighted: Bool
+    var onTargeted: (Bool) -> Void
+    var onDrop: ([URL], CGPoint, CGFloat) -> Bool
+
+    @State private var height: CGFloat = 22
+
+    var body: some View {
+        Label(node.name, systemImage: node.isFolder ? "folder" : "globe")
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+            .background(
+                GeometryReader { proxy in
+                    Color.clear
+                        .onAppear { height = proxy.size.height }
+                        .onChange(of: proxy.size.height) { height = $0 }
+                })
+            .background(highlighted ? Color.accentColor.opacity(0.22) : Color.clear)
+            .tag(node.id)
+            .draggable(node.url)
+            .dropDestination(for: URL.self) { urls, point in
+                onDrop(urls, point, height)
+            } isTargeted: { onTargeted($0) }
     }
 }

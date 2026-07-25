@@ -229,6 +229,37 @@ final class AppModel: ObservableObject {
         try editor.trash(url)
     }
 
+    /// Carries out a drop in the tree: into a folder, or next to a row.
+    ///
+    /// Placing something *next to* a row means the whole folder gets renumbered,
+    /// because the order is the filenames. Moving *into* a folder does not — it
+    /// is a plain file move.
+    @discardableResult
+    func drop(_ source: URL, _ position: DropPosition, relativeTo target: URL) throws -> URL {
+        defer { didChangeShelf() }
+
+        if position == .into {
+            return try editor.move(source, to: target)
+        }
+
+        let folder = target.deletingLastPathComponent()
+        var moved = source
+        if source.deletingLastPathComponent().standardizedFileURL.path
+            != folder.standardizedFileURL.path {
+            moved = try editor.move(source, to: folder)
+        }
+
+        let current = ((try? shelf.children(of: folder)) ?? []).map(\.url)
+        let ordered = ShelfOrdering.reordered(
+            current, moving: moved, to: position, relativeTo: target)
+        let result = try editor.reorder(in: folder, to: ordered)
+
+        // `reorder` answers in the order it was given, so the dropped item's new
+        // URL is at the index it was placed at.
+        guard let index = ordered.firstIndex(of: moved), index < result.count else { return moved }
+        return result[index]
+    }
+
     private func didChangeShelf() {
         revision += 1
     }

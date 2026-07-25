@@ -1,6 +1,19 @@
 import XCTest
 @testable import URLShelf
 
+final class DropPositionTests: XCTestCase {
+    func testFolderRowsHaveAnInsideBand() {
+        XCTAssertEqual(DropPosition.from(relativeY: 0.1, isFolder: true), .before)
+        XCTAssertEqual(DropPosition.from(relativeY: 0.5, isFolder: true), .into)
+        XCTAssertEqual(DropPosition.from(relativeY: 0.9, isFolder: true), .after)
+    }
+
+    func testEntryRowsSplitInHalf() {
+        XCTAssertEqual(DropPosition.from(relativeY: 0.4, isFolder: false), .before)
+        XCTAssertEqual(DropPosition.from(relativeY: 0.6, isFolder: false), .after)
+    }
+}
+
 final class DropRouterTests: XCTestCase {
     private let root = URL(fileURLWithPath: "/shelf")
 
@@ -8,52 +21,63 @@ final class DropRouterTests: XCTestCase {
         URL(fileURLWithPath: "/shelf/\(path)")
     }
 
-    func testMovesAShelfFileIntoAnotherFolder() {
+    func testMovesAShelfFileIntoAFolder() {
         XCTAssertEqual(
-            DropRouter.action(for: file("Wiki.webloc"), into: file("research"), shelfRoot: root),
+            DropRouter.action(
+                for: file("Wiki.webloc"), onto: file("research"),
+                position: .into, shelfRoot: root),
             .move(file("Wiki.webloc")))
     }
 
-    func testMovesAFolderIntoAnotherFolder() {
+    /// The distinction that makes reordering work: sitting in the folder already
+    /// makes an "into" drop a no-op, but a "next to a sibling" drop meaningful.
+    func testDroppingIntoTheCurrentFolderIsANoOpButNextToASiblingIsNot() {
+        let entry = file("research/IANA.webloc")
         XCTAssertEqual(
-            DropRouter.action(for: file("work"), into: file("research"), shelfRoot: root),
-            .move(file("work")))
+            DropRouter.action(
+                for: entry, onto: file("research"), position: .into, shelfRoot: root),
+            .reject)
+        XCTAssertEqual(
+            DropRouter.action(
+                for: entry, onto: file("research/Wiki.webloc"),
+                position: .before, shelfRoot: root),
+            .move(entry))
     }
 
-    func testDroppingOnTheCurrentParentDoesNothing() {
+    func testDroppingOnItselfIsRejected() {
         XCTAssertEqual(
-            DropRouter.action(for: file("research/IANA.webloc"), into: file("research"), shelfRoot: root),
+            DropRouter.action(
+                for: file("Wiki.webloc"), onto: file("Wiki.webloc"),
+                position: .after, shelfRoot: root),
             .reject)
     }
 
-    func testRefusesToDropAFolderOnItself() {
-        XCTAssertEqual(
-            DropRouter.action(for: file("work"), into: file("work"), shelfRoot: root),
-            .reject)
-    }
-
-    /// Would detach the whole branch from the shelf.
     func testRefusesToDropAFolderIntoItsOwnSubtree() {
         XCTAssertEqual(
-            DropRouter.action(for: file("work"), into: file("work/notes"), shelfRoot: root),
+            DropRouter.action(
+                for: file("work"), onto: file("work/notes"), position: .into, shelfRoot: root),
+            .reject)
+        XCTAssertEqual(
+            DropRouter.action(
+                for: file("work"), onto: file("work/notes/Deep.webloc"),
+                position: .before, shelfRoot: root),
             .reject)
     }
 
-    /// Dragging in a file from Documents must not relocate the user's file
-    /// just because it landed on this tree.
+    /// Dragging in a file from Documents must not relocate the user's file just
+    /// because it landed on this tree.
     func testRefusesFilesFromOutsideTheShelf() {
         XCTAssertEqual(
             DropRouter.action(
                 for: URL(fileURLWithPath: "/Users/someone/Documents/Notes.webloc"),
-                into: file("research"),
-                shelfRoot: root),
+                onto: file("research"), position: .into, shelfRoot: root),
             .reject)
     }
 
     func testFilesAWebAddressDraggedFromABrowser() {
         let web = URL(string: "https://example.com")!
         XCTAssertEqual(
-            DropRouter.action(for: web, into: file("research"), shelfRoot: root),
+            DropRouter.action(for: web, onto: file("research"), position: .into, shelfRoot: root),
             .addEntry(web))
     }
 
@@ -61,8 +85,7 @@ final class DropRouterTests: XCTestCase {
         XCTAssertEqual(
             DropRouter.action(
                 for: URL(string: "mailto:someone@example.com")!,
-                into: file("research"),
-                shelfRoot: root),
+                onto: file("research"), position: .into, shelfRoot: root),
             .reject)
     }
 }
