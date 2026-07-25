@@ -36,6 +36,24 @@ final class AppModel {
         try config.write(to: configURL)
     }
 
+    func setNormalBrowser(_ selection: BrowserSelection) throws {
+        config.normalBrowser = selection
+        try config.write(to: configURL)
+    }
+
+    /// `nil` clears the choice, which leaves private entries disabled rather
+    /// than opening them in the normal browser.
+    func setPrivateBrowser(_ bundleID: String?) throws {
+        config.privateBrowser = bundleID
+        try config.write(to: configURL)
+    }
+
+    /// True when private entries cannot be honoured only because nothing has
+    /// been chosen yet — as opposed to no capable browser being installed.
+    var needsPrivateBrowserChoice: Bool {
+        config.privateBrowser == nil && !inventory.privateCapableBrowsers().isEmpty
+    }
+
     // MARK: - Entries
 
     /// Both ways an entry can be opened: as configured, and as an Option-click

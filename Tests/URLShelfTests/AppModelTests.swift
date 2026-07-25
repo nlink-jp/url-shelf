@@ -171,3 +171,62 @@ final class AppModelTests: XCTestCase {
         XCTAssertEqual(model.config.normalBrowser, .bundleID("com.google.Chrome"))
     }
 }
+
+@MainActor
+final class BrowserSelectionPersistenceTests: XCTestCase {
+    private var root: URL!
+    private var configURL: URL!
+
+    override func setUpWithError() throws {
+        root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        configURL = root.appendingPathComponent("config.toml")
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    private func makeModel(installed: Set<String>) -> AppModel {
+        AppModel(
+            configURL: configURL,
+            shelf: FakeShelf(),
+            inventory: FakeInventory(installed: installed),
+            launcher: SpyLauncher())
+    }
+
+    func testSettingThePrivateBrowserPersists() throws {
+        let model = makeModel(installed: ["org.mozilla.firefox"])
+        try model.setPrivateBrowser("org.mozilla.firefox")
+
+        XCTAssertEqual(AppConfig.read(contentsOf: configURL).privateBrowser, "org.mozilla.firefox")
+    }
+
+    func testClearingThePrivateBrowserPersistsAsUnset() throws {
+        let model = makeModel(installed: ["org.mozilla.firefox"])
+        try model.setPrivateBrowser("org.mozilla.firefox")
+        try model.setPrivateBrowser(nil)
+
+        XCTAssertNil(AppConfig.read(contentsOf: configURL).privateBrowser)
+    }
+
+    func testSettingTheNormalBrowserPersists() throws {
+        let model = makeModel(installed: ["com.apple.Safari"])
+        try model.setNormalBrowser(.bundleID("com.apple.Safari"))
+
+        XCTAssertEqual(
+            AppConfig.read(contentsOf: configURL).normalBrowser, .bundleID("com.apple.Safari"))
+    }
+
+    /// The prompt appears only when choosing a browser would actually help.
+    func testNeedsChoiceOnlyWhenACapableBrowserExists() throws {
+        let capable = makeModel(installed: ["org.mozilla.firefox", "com.apple.Safari"])
+        XCTAssertTrue(capable.needsPrivateBrowserChoice)
+
+        let safariOnly = makeModel(installed: ["com.apple.Safari"])
+        XCTAssertFalse(safariOnly.needsPrivateBrowserChoice)
+
+        try capable.setPrivateBrowser("org.mozilla.firefox")
+        XCTAssertFalse(capable.needsPrivateBrowserChoice)
+    }
+}

@@ -149,6 +149,75 @@ final class StatusItemController: NSObject {
         }
     }
 
+    /// Browser pickers live in the menu because a disabled private entry is
+    /// otherwise a dead end: the reason it is disabled and the place to fix it
+    /// have to be reachable from the same click.
+    private func browserMenuItem(title: String, mode: OpenMode) -> NSMenuItem {
+        let item = NSMenuItem(title: title, action: nil, keyEquivalent: "")
+        let submenu = NSMenu(title: title)
+
+        if mode == .normal {
+            let systemDefault = NSMenuItem(
+                title: "System Default",
+                action: #selector(selectNormalBrowser(_:)),
+                keyEquivalent: "")
+            systemDefault.target = self
+            systemDefault.representedObject = BrowserSelection.systemDefault.configValue
+            systemDefault.state = model.config.normalBrowser == .systemDefault ? .on : .off
+            submenu.addItem(systemDefault)
+            submenu.addItem(.separator())
+        }
+
+        let candidates = mode == .normal
+            ? model.inventory.installedBrowsers()
+            : model.inventory.privateCapableBrowsers()
+
+        if candidates.isEmpty {
+            submenu.addItem(disabledItem("No capable browser installed"))
+        }
+
+        for capability in candidates {
+            let entry = NSMenuItem(
+                title: capability.displayName,
+                action: mode == .normal
+                    ? #selector(selectNormalBrowser(_:))
+                    : #selector(selectPrivateBrowser(_:)),
+                keyEquivalent: "")
+            entry.target = self
+            entry.representedObject = capability.bundleID
+            entry.state = isSelected(capability.bundleID, for: mode) ? .on : .off
+            submenu.addItem(entry)
+        }
+
+        item.submenu = submenu
+        return item
+    }
+
+    private func isSelected(_ bundleID: String, for mode: OpenMode) -> Bool {
+        switch mode {
+        case .normal: return model.config.normalBrowser == .bundleID(bundleID)
+        case .privateWindow: return model.config.privateBrowser == bundleID
+        }
+    }
+
+    @objc private func selectNormalBrowser(_ sender: NSMenuItem) {
+        guard let value = sender.representedObject as? String else { return }
+        do {
+            try model.setNormalBrowser(BrowserSelection(configValue: value))
+        } catch {
+            model.present(error)
+        }
+    }
+
+    @objc private func selectPrivateBrowser(_ sender: NSMenuItem) {
+        guard let bundleID = sender.representedObject as? String else { return }
+        do {
+            try model.setPrivateBrowser(bundleID)
+        } catch {
+            model.present(error)
+        }
+    }
+
     @objc private func chooseShelfFolder() {
         let panel = NSOpenPanel()
         panel.canChooseFiles = false
@@ -187,17 +256,24 @@ extension StatusItemController: NSMenuDelegate {
         }
 
         menu.addItem(.separator())
-        let choose = NSMenuItem(
-            title: "Choose Shelf Folder…", action: #selector(chooseShelfFolder), keyEquivalent: "")
-        choose.target = self
-        menu.addItem(choose)
 
-        if model.inventory.privateCapableBrowsers().isEmpty {
+        // Stated inline, not just as a tooltip: a disabled entry with no visible
+        // explanation reads as a broken app rather than as a setting to make.
+        if model.needsPrivateBrowserChoice {
+            menu.addItem(disabledItem("Private entries need a browser — choose one below"))
+        } else if model.inventory.privateCapableBrowsers().isEmpty {
             let warning = disabledItem("No private-capable browser installed")
             warning.toolTip = "Safari cannot be opened in a private window from another app. "
                 + "Install Firefox, Chrome, or Edge to use private entries."
             menu.addItem(warning)
         }
+
+        let choose = NSMenuItem(
+            title: "Choose Shelf Folder…", action: #selector(chooseShelfFolder), keyEquivalent: "")
+        choose.target = self
+        menu.addItem(choose)
+        menu.addItem(browserMenuItem(title: "Normal Browser", mode: .normal))
+        menu.addItem(browserMenuItem(title: "Private Browser", mode: .privateWindow))
 
         menu.addItem(.separator())
         menu.addItem(disabledItem("URL Shelf \(AppInfo.version)"))
