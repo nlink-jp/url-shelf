@@ -6,13 +6,6 @@ struct SettingsView: View {
     @State private var loginItemEnabled = false
     @State private var errorMessage: String?
 
-    // Add-entry form
-    @State private var newURL = ""
-    @State private var newName = ""
-    @State private var newFolder = ""
-    @State private var newIsPrivate = false
-    @State private var addedMessage: String?
-
     var body: some View {
         Form {
             Section("Shelf") {
@@ -73,26 +66,6 @@ struct SettingsView: View {
                     Text("Available once the app is installed as a bundle.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                }
-            }
-
-            Section("Add URL") {
-                TextField("URL", text: $newURL, prompt: Text("https://example.com"))
-                TextField("Name", text: $newName, prompt: Text("Taken from the address"))
-                Picker("Folder", selection: $newFolder) {
-                    ForEach(model.folderPaths(), id: \.self) { path in
-                        Text(path.isEmpty ? "Shelf root" : path).tag(path)
-                    }
-                }
-                Toggle("Open in a private window", isOn: $newIsPrivate)
-                HStack {
-                    Spacer()
-                    Button("Add", action: addEntry)
-                        .disabled(newURL.trimmingCharacters(in: .whitespaces).isEmpty
-                                  || model.rootURL == nil)
-                }
-                if let addedMessage {
-                    Text(addedMessage).font(.caption).foregroundStyle(.secondary)
                 }
             }
 
@@ -157,30 +130,6 @@ struct SettingsView: View {
             errorMessage = error.localizedDescription
             // Reflect what the system actually did, not what was asked for.
             loginItemEnabled = model.loginItem.isEnabled
-        }
-    }
-
-    private func addEntry() {
-        let trimmed = newURL.trimmingCharacters(in: .whitespaces)
-        guard let url = URL(string: trimmed), url.scheme != nil else {
-            errorMessage = "That is not a URL. Include the scheme, e.g. https://example.com"
-            return
-        }
-        guard let folder = model.url(forFolderPath: newFolder) else {
-            errorMessage = "Choose a shelf folder first."
-            return
-        }
-
-        perform {
-            let fileURL = try model.addEntry(
-                url: url,
-                name: newName,
-                in: folder,
-                openMode: newIsPrivate ? .privateWindow : nil)
-            addedMessage = "Added \(fileURL.lastPathComponent)"
-            newURL = ""
-            newName = ""
-            newIsPrivate = false
         }
     }
 

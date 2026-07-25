@@ -24,7 +24,15 @@ final class StatusItemController: NSObject {
     private let model: AppModel
     private let statusItem: NSStatusItem
     private let menu = NSMenu()
-    private let settings: SettingsWindowController
+    private let settingsWindow: HostedWindow
+
+    /// Rebuilt on each open (the window drops its content when closed), so the
+    /// folder list and the clipboard prefill are always current.
+    private lazy var addWindow: HostedWindow = HostedWindow(
+        title: "Add URL", size: NSSize(width: 460, height: 340)
+    ) { [unowned self] in
+        AddEntryView(model: self.model) { [weak self] in self?.addWindow.close() }
+    }
 
     /// Which folder each submenu shows. `NSMenu.delegate` is weak and menus are
     /// rebuilt constantly, so the mapping lives here rather than on the menus.
@@ -32,7 +40,9 @@ final class StatusItemController: NSObject {
 
     init(model: AppModel) {
         self.model = model
-        settings = SettingsWindowController(model: model)
+        settingsWindow = HostedWindow(title: "URL Shelf Settings", size: NSSize(width: 520, height: 520)) {
+            SettingsView(model: model)
+        }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         super.init()
 
@@ -234,7 +244,11 @@ final class StatusItemController: NSObject {
     }
 
     @objc private func openSettings() {
-        settings.show()
+        settingsWindow.show()
+    }
+
+    @objc private func openAddEntry() {
+        addWindow.show()
     }
 
     @objc private func openAbout() {
@@ -299,6 +313,10 @@ extension StatusItemController: NSMenuDelegate {
             reveal.representedObject = root
             menu.addItem(reveal)
         }
+
+        let add = NSMenuItem(title: "Add URL…", action: #selector(openAddEntry), keyEquivalent: "n")
+        add.target = self
+        menu.addItem(add)
 
         let settingsItem = NSMenuItem(
             title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")
