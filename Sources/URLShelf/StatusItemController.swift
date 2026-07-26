@@ -186,6 +186,9 @@ final class StatusItemController: NSObject {
         let item = NSMenuItem(title: title, action: #selector(openEntry(_:)), keyEquivalent: "")
         item.target = self
         item.representedObject = target
+        // NSMenuItem defaults this to .command, so the plain item would claim the
+        // Command modifier and shadow the alternate that wants it.
+        item.keyEquivalentModifierMask = []
         item.image = NSImage(
             systemSymbolName: mode == .privateWindow ? "eyeglasses" : "globe",
             accessibilityDescription: nil)

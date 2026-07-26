@@ -84,6 +84,9 @@ Resolution order: **entry > nearest ancestor folder > global config**
   static, otherwise it is deallocated immediately after `main()`.
 - **`NSStatusItem`, not `MenuBarExtra`** — required for lazy submenu population,
   the alternate items, and drag-and-drop onto the status item.
+- **`NSMenuItem.keyEquivalentModifierMask` defaults to `.command`.** A primary item
+  in an alternate group must have it cleared to `[]`, or it claims Command and the
+  Command alternate never fires.
 - **An `NSMenu` does not deliver right-clicks to its items**, and a submenu stops the
   parent item's action from firing at all. Per-entry actions therefore ride on
   modifier alternates: Option (invert mode), Command (settings), Option-Command
