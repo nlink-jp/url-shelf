@@ -71,11 +71,15 @@ Changes show up the next time a menu opens; nothing needs to be told.
 - Dropping a URL on the menu bar icon files it in the drop-target folder
 - Ordering comes from a numeric filename prefix (`01_`, `02_`), stripped from the
   label — rename in Finder to reorder
-- To change an existing entry's open mode or browser, edit its `.webloc` in a text
-  editor (it is XML) or add it again
+- To change an existing entry's URL, open mode, or browser, hold **Option-Command**
+  and click it in the menu
 
-url-shelf had a built-in editor for a while; see
-[ADR-0001](docs/en/adr-0001-shelf-management.md) for why it was removed.
+Modifier keys on a menu entry: **Option** inverts normal ⇄ private for that click,
+**Command** reveals the file in Finder, **Option-Command** opens its settings.
+
+url-shelf had a built-in shelf editor for a while; see
+[ADR-0001](docs/en/adr-0001-shelf-management.md) for why the tree was removed and
+only the single-entry editor kept.
 
 ## Configuration
 

@@ -25,6 +25,8 @@ final class StatusItemController: NSObject {
     private let statusItem: NSStatusItem
     private let menu = NSMenu()
     private let settingsWindow: HostedWindow
+    /// Rebuilt per entry: the window's content is the entry it was opened for.
+    private var editWindow: HostedWindow?
 
     /// Rebuilt on each open (the window drops its content when closed), so the
     /// folder list and the clipboard prefill are always current.
@@ -159,6 +161,20 @@ final class StatusItemController: NSObject {
         reveal.keyEquivalentModifierMask = .command
         reveal.isAlternate = true
         menu.addItem(reveal)
+
+        // Option+Command: the open mode and browser live inside the .webloc, so
+        // this is the one edit Finder cannot make.
+        let edit = NSMenuItem(
+            title: "\(name) (Settings…)",
+            action: #selector(editEntry(_:)),
+            keyEquivalent: "")
+        edit.target = self
+        edit.representedObject = EntryTarget(
+            fileURL: fileURL, folderURL: folder, useInverted: false)
+        edit.image = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: nil)
+        edit.keyEquivalentModifierMask = [.option, .command]
+        edit.isAlternate = true
+        menu.addItem(edit)
     }
 
     private func entryItem(
@@ -260,6 +276,24 @@ final class StatusItemController: NSObject {
     @objc private func openShelfFolder(_ sender: NSMenuItem) {
         guard let url = sender.representedObject as? URL else { return }
         NSWorkspace.shared.open(url)
+    }
+
+    @objc private func editEntry(_ sender: NSMenuItem) {
+        guard let target = sender.representedObject as? EntryTarget else { return }
+
+        editWindow?.close()
+        let model = self.model
+        let window = HostedWindow(
+            title: DisplayName.fromFilename(target.fileURL.lastPathComponent),
+            size: NSSize(width: 460, height: 320)
+        ) { [weak self] in
+            EditEntryView(
+                model: model,
+                fileURL: target.fileURL,
+                onFinish: { self?.editWindow?.close() })
+        }
+        editWindow = window
+        window.show()
     }
 
     @objc private func revealInFinder(_ sender: NSMenuItem) {

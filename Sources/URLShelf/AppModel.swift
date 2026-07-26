@@ -177,6 +177,26 @@ final class AppModel: ObservableObject {
         revision += 1
     }
 
+    func entry(at fileURL: URL) throws -> WeblocFile {
+        try WeblocFile.read(contentsOf: fileURL)
+    }
+
+    /// Edits an entry in place. Double optionals distinguish "leave alone" from
+    /// "set to nothing" — clearing a browser override is a real edit.
+    func updateEntry(
+        at fileURL: URL,
+        url: URL? = nil,
+        openMode: OpenMode?? = nil,
+        browserBundleID: String?? = nil
+    ) throws {
+        var entry = try WeblocFile.read(contentsOf: fileURL)
+        if let url { entry.url = url }
+        if let openMode { entry.openMode = openMode }
+        if let browserBundleID { entry.browserBundleID = browserBundleID }
+        try entry.write(to: fileURL)
+        didChangeShelf()
+    }
+
     // MARK: - Launching
 
     func run(_ action: LaunchAction) {

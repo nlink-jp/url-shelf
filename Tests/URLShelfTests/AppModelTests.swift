@@ -230,3 +230,73 @@ final class BrowserSelectionPersistenceTests: XCTestCase {
         XCTAssertFalse(capable.needsPrivateBrowserChoice)
     }
 }
+
+@MainActor
+final class UpdateEntryTests: XCTestCase {
+    private var root: URL!
+    private var model: AppModel!
+
+    override func setUpWithError() throws {
+        root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+        let configURL = root.appendingPathComponent("config.toml")
+        try "[shelf]\nroot = \(MiniTOML.quote(root.path))"
+            .write(to: configURL, atomically: true, encoding: .utf8)
+        model = AppModel(configURL: configURL)
+    }
+
+    override func tearDownWithError() throws {
+        try? FileManager.default.removeItem(at: root)
+    }
+
+    private func makeEntry() throws -> URL {
+        try model.addEntry(url: URL(string: "https://example.com")!, name: "Entry", in: root)
+    }
+
+    func testChangesTheURLWithoutTouchingTheRest() throws {
+        let fileURL = try makeEntry()
+        try model.updateEntry(at: fileURL, openMode: .some(.privateWindow))
+        try model.updateEntry(at: fileURL, url: URL(string: "https://example.org")!)
+
+        let reloaded = try model.entry(at: fileURL)
+        XCTAssertEqual(reloaded.url.absoluteString, "https://example.org")
+        XCTAssertEqual(reloaded.openMode, .privateWindow)
+    }
+
+    /// Clearing a setting is an edit, not an omission — hence the double optional.
+    func testClearingAnOverrideRemovesTheKey() throws {
+        let fileURL = try makeEntry()
+        try model.updateEntry(at: fileURL, browserBundleID: .some("com.google.Chrome"))
+        try model.updateEntry(at: fileURL, browserBundleID: .some(nil))
+
+        let reloaded = try model.entry(at: fileURL)
+        XCTAssertNil(reloaded.browserBundleID)
+        XCTAssertEqual(reloaded.foreignKeys, [])
+    }
+
+    func testOmittedArgumentsLeaveTheEntryAlone() throws {
+        let fileURL = try makeEntry()
+        try model.updateEntry(at: fileURL, openMode: .some(.privateWindow))
+        try model.updateEntry(at: fileURL)
+
+        XCTAssertEqual(try model.entry(at: fileURL).openMode, .privateWindow)
+    }
+
+    func testEditingPreservesAnotherToolsKeys() throws {
+        let fileURL = root.appendingPathComponent("Foreign.webloc")
+        try Data("""
+        <?xml version="1.0" encoding="UTF-8"?>
+        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+        <plist version="1.0">
+        <dict>
+        <key>URL</key><string>https://example.com</string>
+        <key>com.example.other</key><string>keep me</string>
+        </dict>
+        </plist>
+        """.utf8).write(to: fileURL)
+
+        try model.updateEntry(at: fileURL, openMode: .some(.privateWindow))
+
+        XCTAssertEqual(try model.entry(at: fileURL).foreignKeys, ["com.example.other"])
+    }
+}

@@ -62,6 +62,7 @@ Sources/URLShelf/
     HostedWindow.swift          NSWindow + NSHostingView host; activation-policy counting
     SettingsView.swift          configuration only
     AddEntryView.swift          quick capture, clipboard prefill
+    EditEntryView.swift         single-entry settings (Option-Command in the menu)
     URLDropView.swift           drop target overlaid on the status item button
 Tests/URLShelfTests/            unit tests for every pure layer
 spikes/launch-probe.swift       browser private-launch harness (see Gotchas)
@@ -82,7 +83,12 @@ Resolution order: **entry > nearest ancestor folder > global config**
 - **`NSApplication.delegate` is weak** — `URLShelfMain` owns the delegate in a
   static, otherwise it is deallocated immediately after `main()`.
 - **`NSStatusItem`, not `MenuBarExtra`** — required for lazy submenu population,
-  Option-key alternate items, and drag-and-drop onto the status item.
+  the alternate items, and drag-and-drop onto the status item.
+- **An `NSMenu` does not deliver right-clicks to its items**, and a submenu stops the
+  parent item's action from firing at all. Per-entry actions therefore ride on
+  modifier alternates: Option (invert mode), Command (reveal), Option-Command
+  (settings). Doing better needs `NSMenuItem.view`, which forfeits alternates,
+  highlighting, and keyboard handling.
 - **Ordering-prefix stripping is capped at 3 digits** so that names starting with
   a year (`2026-07-26 notes.webloc`) are not mangled.
 - **Argument forwarding works, but only with `createsNewApplicationInstance = true`**
@@ -99,8 +105,10 @@ Resolution order: **entry > nearest ancestor folder > global config**
 - **Safari cannot be driven into a private window** from outside. Do not add UI
   scripting (Cmd+Shift+N) as a workaround — it needs Accessibility permission and
   breaks across OS updates.
-- **The app does not edit the shelf.** An in-app tree editor was built and removed;
-  rearranging is Finder's job. Before rebuilding anything like it, read ADR-0001 —
+- **The app edits entries, not the shelf.** Only the settings inside a `.webloc`
+  are editable in-app; renaming, moving, and deleting are Finder's job. An in-app
+  tree editor was built and removed — before rebuilding anything like it, read
+  ADR-0001 —
   SwiftUI's `List`/`OutlineGroup` cannot report the end of a drag session reliably,
   and the fix is `NSOutlineView`, not more callbacks.
 - **Never walk the filesystem from a view body.** SwiftUI re-evaluates bodies often
