@@ -30,4 +30,12 @@ final class DisplayNameTests: XCTestCase {
     func testKeepsInternalDots() {
         XCTAssertEqual(DisplayName.fromFilename("example.com.webloc"), "example.com")
     }
+
+    func testOrderPrefixMatchesTheStrippedName() {
+        for stem in ["01_Wiki", "10 - Docs", "Wiki", "2026-07-26 notes", "007", "3Dプリンタ"] {
+            XCTAssertEqual(
+                DisplayName.orderPrefix(of: stem) + DisplayName.strippingOrderPrefix(stem),
+                stem, stem)
+        }
+    }
 }

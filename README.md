@@ -60,28 +60,22 @@ it can only be chosen for normal URLs. When no private-capable browser is
 installed, private entries are shown disabled — url-shelf never silently opens
 them in the normal session.
 
-## Managing the shelf
+## Arranging the shelf
 
-Everything can be done in Finder — that is the point of keeping the records as
-files. The Shelf window exists for the one thing Finder cannot do: editing the
-settings stored *inside* a `.webloc`.
+Use Finder. Creating folders, renaming, moving, and deleting are all just files —
+that is the point of storing the shelf this way, and Finder is already good at it.
+Changes show up the next time a menu opens; nothing needs to be told.
 
-- **Shelf…** (Cmd-E) opens a tree with an inspector: rename, move, delete, and set
-  each entry's URL, open mode, and browser
-- **Add URL…** (Cmd-N) files a single URL, prefilled from the clipboard
+- **Add URL…** (Cmd-N) files a single URL, prefilled from the clipboard, and is
+  where an entry's open mode and browser are chosen
 - Dropping a URL on the menu bar icon files it in the drop-target folder
-- Deleting moves to the **Trash**, so a mistake is recoverable from Finder
-- Entries and folders are **dragged within the tree**: a line shows where the item
-  will land, a highlight shows the folder it will go into. A URL dragged in from a browser is filed
-  straight into the folder it lands on
-- Reordering renumbers that folder's filenames (`010_`, `020_`, …), because the
-  order *is* the filenames — nothing records positions behind your back
-- Renaming keeps any ordering prefix, so an entry does not jump position
+- Ordering comes from a numeric filename prefix (`01_`, `02_`), stripped from the
+  label — rename in Finder to reorder
+- To change an existing entry's open mode or browser, edit its `.webloc` in a text
+  editor (it is XML) or add it again
 
-Changes made in Finder while the app is running are picked up automatically —
-the shelf is re-read whenever a menu or the Shelf window needs it. See
-[ADR-0001](docs/en/adr-0001-shelf-management.md) for why the editor exists and
-what was deliberately left out.
+url-shelf had a built-in editor for a while; see
+[ADR-0001](docs/en/adr-0001-shelf-management.md) for why it was removed.
 
 ## Configuration
 

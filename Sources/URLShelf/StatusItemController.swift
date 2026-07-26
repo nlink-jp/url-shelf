@@ -25,11 +25,6 @@ final class StatusItemController: NSObject {
     private let statusItem: NSStatusItem
     private let menu = NSMenu()
     private let settingsWindow: HostedWindow
-    private lazy var shelfWindow: HostedWindow = HostedWindow(
-        title: "Shelf", size: NSSize(width: 760, height: 520)
-    ) { [unowned self] in
-        ShelfView(model: self.model)
-    }
 
     /// Rebuilt on each open (the window drops its content when closed), so the
     /// folder list and the clipboard prefill are always current.
@@ -256,10 +251,6 @@ final class StatusItemController: NSObject {
         addWindow.show()
     }
 
-    @objc private func openShelf() {
-        shelfWindow.show()
-    }
-
     @objc private func openAbout() {
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
@@ -326,11 +317,6 @@ extension StatusItemController: NSMenuDelegate {
         let add = NSMenuItem(title: "Add URL…", action: #selector(openAddEntry), keyEquivalent: "n")
         add.target = self
         menu.addItem(add)
-
-        let shelf = NSMenuItem(title: "Shelf…", action: #selector(openShelf), keyEquivalent: "e")
-        shelf.target = self
-        shelf.isEnabled = model.rootURL != nil
-        menu.addItem(shelf)
 
         let settingsItem = NSMenuItem(
             title: "Settings…", action: #selector(openSettings), keyEquivalent: ",")

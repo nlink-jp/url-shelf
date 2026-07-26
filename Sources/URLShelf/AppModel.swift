@@ -10,22 +10,19 @@ final class AppModel: ObservableObject {
     let inventory: BrowserInventory
     let launcher: BrowserLaunching
     let loginItem: LoginItemManaging
-    let editor: ShelfEditing
 
     init(
         configURL: URL = AppConfig.defaultFileURL(),
         shelf: ShelfReading = FileSystemShelf(),
         inventory: BrowserInventory = WorkspaceBrowserInventory(),
         launcher: BrowserLaunching = WorkspaceBrowserLauncher(),
-        loginItem: LoginItemManaging = SMAppServiceLoginItem(),
-        editor: ShelfEditing = FileSystemShelfEditor()
+        loginItem: LoginItemManaging = SMAppServiceLoginItem()
     ) {
         self.configURL = configURL
         self.shelf = shelf
         self.inventory = inventory
         self.launcher = launcher
         self.loginItem = loginItem
-        self.editor = editor
         config = AppConfig.read(contentsOf: configURL)
     }
 
@@ -173,105 +170,8 @@ final class AppModel: ObservableObject {
         return path.isEmpty ? root : root.appendingPathComponent(path)
     }
 
-    // MARK: - Editing the shelf
-
-    /// Bumped after every mutation so views reload the tree. The filesystem is
-    /// still the only source of truth — this is a "look again" signal, not state.
+    /// Bumped whenever the shelf changes, so cached views reload.
     @Published private(set) var revision = 0
-
-    func tree() -> ShelfNode? {
-        rootURL.map { shelf.tree(at: $0, name: "Shelf") }
-    }
-
-    func entry(at fileURL: URL) throws -> WeblocFile {
-        try WeblocFile.read(contentsOf: fileURL)
-    }
-
-    func folderDefaults(at folder: URL) -> FolderDefaults {
-        shelf.defaults(at: folder)
-    }
-
-    func updateEntry(
-        at fileURL: URL,
-        url: URL? = nil,
-        openMode: OpenMode?? = nil,
-        browserBundleID: String?? = nil
-    ) throws {
-        var entry = try WeblocFile.read(contentsOf: fileURL)
-        if let url { entry.url = url }
-        if let openMode { entry.openMode = openMode }
-        if let browserBundleID { entry.browserBundleID = browserBundleID }
-        try entry.write(to: fileURL)
-        didChangeShelf()
-    }
-
-    /// Writing empty defaults removes the file rather than leaving an inert one:
-    /// the shelf should not accumulate files that say nothing.
-    func setFolderDefaults(_ defaults: FolderDefaults, at folder: URL) throws {
-        let fileURL = folder.appendingPathComponent(FolderDefaults.filename)
-        if defaults.isEmpty {
-            if FileManager.default.fileExists(atPath: fileURL.path) {
-                try FileManager.default.removeItem(at: fileURL)
-            }
-        } else {
-            try defaults.serialized().write(to: fileURL, atomically: true, encoding: .utf8)
-        }
-        didChangeShelf()
-    }
-
-    @discardableResult
-    func createFolder(named name: String, in parent: URL) throws -> URL {
-        defer { didChangeShelf() }
-        return try editor.createFolder(named: name, in: parent)
-    }
-
-    @discardableResult
-    func rename(_ url: URL, toDisplayName newName: String) throws -> URL {
-        defer { didChangeShelf() }
-        return try editor.rename(url, toDisplayName: newName)
-    }
-
-    @discardableResult
-    func move(_ url: URL, to destination: URL) throws -> URL {
-        defer { didChangeShelf() }
-        return try editor.move(url, to: destination)
-    }
-
-    func trash(_ url: URL) throws {
-        defer { didChangeShelf() }
-        try editor.trash(url)
-    }
-
-    /// Carries out a drop in the tree: into a folder, or next to a row.
-    ///
-    /// Placing something *next to* a row means the whole folder gets renumbered,
-    /// because the order is the filenames. Moving *into* a folder does not — it
-    /// is a plain file move.
-    @discardableResult
-    func drop(_ source: URL, _ position: DropPosition, relativeTo target: URL) throws -> URL {
-        defer { didChangeShelf() }
-
-        if position == .into {
-            return try editor.move(source, to: target)
-        }
-
-        let folder = target.deletingLastPathComponent()
-        var moved = source
-        if source.deletingLastPathComponent().standardizedFileURL.path
-            != folder.standardizedFileURL.path {
-            moved = try editor.move(source, to: folder)
-        }
-
-        let current = ((try? shelf.children(of: folder)) ?? []).map(\.url)
-        let ordered = ShelfOrdering.reordered(
-            current, moving: moved, to: position, relativeTo: target)
-        let result = try editor.reorder(in: folder, to: ordered)
-
-        // `reorder` answers in the order it was given, so the dropped item's new
-        // URL is at the index it was placed at.
-        guard let index = ordered.firstIndex(of: moved), index < result.count else { return moved }
-        return result[index]
-    }
 
     private func didChangeShelf() {
         revision += 1

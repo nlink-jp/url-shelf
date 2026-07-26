@@ -10,8 +10,8 @@ Safari has no supported mechanism). **Apple Silicon, macOS 13+. GUI only** (no
 CLI — a deliberate departure from the util-series CLI-in-GUI convention;
 testability is covered by unit tests on the pure layers).
 
-**Status:** in development. Reading, launching, and shelf editing work; not yet
-packaged or released. Design of record:
+**Status:** in development. Reading and launching work; not yet packaged or
+released. Design of record:
 `docs/en/url-shelf-rfp.md` / `docs/ja/url-shelf-rfp.ja.md`.
 
 ## Build / test / run
@@ -51,8 +51,7 @@ Sources/URLShelf/
     FolderDefaults.swift        .url-shelf.toml model
     AppConfig.swift             ~/.config/url-shelf/config.toml model
   Services/
-    ShelfStore.swift            FileSystemShelf: one-level walk, defaults chain, full tree
-    ShelfEditor.swift           create/rename/move/trash behind ShelfEditing
+    ShelfStore.swift            FileSystemShelf: one-level walk, defaults chain
     MetadataResolver.swift      entry > nearest folder > global config
     LaunchPlanner.swift         resolved plan → LaunchAction, by table lookup
     BrowserCatalog.swift        measured private-flag table + installed-browser filter
@@ -63,7 +62,6 @@ Sources/URLShelf/
     HostedWindow.swift          NSWindow + NSHostingView host; activation-policy counting
     SettingsView.swift          configuration only
     AddEntryView.swift          quick capture, clipboard prefill
-    ShelfView.swift             tree + inspector (the editor)
     URLDropView.swift           drop target overlaid on the status item button
 Tests/URLShelfTests/            unit tests for every pure layer
 spikes/launch-probe.swift       browser private-launch harness (see Gotchas)
@@ -101,12 +99,12 @@ Resolution order: **entry > nearest ancestor folder > global config**
 - **Safari cannot be driven into a private window** from outside. Do not add UI
   scripting (Cmd+Shift+N) as a workaround — it needs Accessibility permission and
   breaks across OS updates.
-- **`DropDelegate`, not `.dropDestination`** in the Shelf tree. `dropDestination`
-  reports the pointer position only at the moment of the drop, so it cannot show an
-  insertion line; `DropDelegate.dropUpdated` reports it throughout the drag.
-- **Reordering renames every sibling in the folder**, subfolders included, because
-  the order is the filenames. Two-phase rename through hidden temporary names, so a
-  swap cannot collide. Prefixes stay ≤3 digits (4 reads as a year).
+- **The app does not edit the shelf.** An in-app tree editor was built and removed;
+  rearranging is Finder's job. Before rebuilding anything like it, read ADR-0001 —
+  SwiftUI's `List`/`OutlineGroup` cannot report the end of a drag session reliably,
+  and the fix is `NSOutlineView`, not more callbacks.
+- **Never walk the filesystem from a view body.** SwiftUI re-evaluates bodies often
+  enough that this froze the window during a drag.
 - Signing scripts under `scripts/` are vendored verbatim from
   `nlink-jp/.github/templates/`; `check-org.sh` flags any drift.
 

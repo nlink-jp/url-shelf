@@ -42,16 +42,4 @@ enum DisplayName {
         guard separatorCount > 0, !rest.isEmpty else { return "" }
         return String(stem.dropLast(rest.count))
     }
-
-    /// The filename for `newDisplayName`, keeping whatever ordering prefix and
-    /// extension the old filename had.
-    ///
-    /// Renaming must not silently move an entry to a different position in the
-    /// menu — the prefix is the user's ordering, not part of the name.
-    static func renamedFilename(_ filename: String, to newDisplayName: String) -> String {
-        let stem = (filename as NSString).deletingPathExtension
-        let pathExtension = (filename as NSString).pathExtension
-        let renamed = orderPrefix(of: stem) + EntryNaming.sanitize(newDisplayName)
-        return pathExtension.isEmpty ? renamed : "\(renamed).\(pathExtension)"
-    }
 }

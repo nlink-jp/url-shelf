@@ -1,7 +1,7 @@
-# ADR-0001: Shelf editing belongs inside url-shelf
+# ADR-0001: Shelf editing belongs inside url-shelf (implemented, then reversed)
 
 > Date: 2026-07-26
-> Status: Accepted (revised 2026-07-26: reordering moved from deferred to implemented)
+> Status: **Reversed** (implemented and withdrawn the same day)
 
 ## Context
 
@@ -18,58 +18,55 @@ Using a real shelf of `.webloc` files exposed a gap Finder cannot fill.
 | **Edit an entry's URL, open mode, or browser** | **no** (hand-editing a plist) | **the real gap** |
 | Maintain ordering prefixes | yes, by hand | tedious |
 
-The core need is the metadata Finder cannot touch; file operations simply belong on
-the same screen once that editor exists.
+## The original decision
 
-## Decision
+Add a Shelf window — a tree pane and an inspector pane — offering rename, move,
+delete, metadata editing, and drag-to-reorder. Deletion through the Trash, renaming
+preserving the ordering prefix, reordering renumbering the folder's filenames.
 
-**Add a Shelf window: a tree pane and an inspector pane.**
+## Reversal
 
-- The whole shelf tree on the left, an inspector for the selection on the right
-- Entry inspector: display name, URL, containing folder, open mode, browser
-- Folder inspector: display name, containing folder, `.url-shelf.toml` defaults
-- Changes apply immediately (no Save button); text fields commit on Return or focus loss
-- Relocation happens by **dragging within the tree** and through the inspector's
-  folder picker. Dropping on a row's top or bottom edge **reorders**; dropping in
-  the middle of a folder row **moves into** it
-- Deletion goes to the Trash via `FileManager.trashItem`; `unlink` is never used
-- The tree is re-read after every operation
+**It was built, the interaction never became good enough, and the feature was
+removed.**
 
-The `Add URL` window stays. Filing the URL you are looking at is a different act
-from reorganizing, and a light window with a clipboard prefill is faster for it.
+Drag and drop in a SwiftUI tree is where it broke down.
 
-## Alternatives rejected or deferred
+1. `.dropDestination` reports the pointer position only at the moment of the drop.
+   No insertion line could be drawn, so nothing showed where the item would land
+   until it was already there.
+2. `DropDelegate` does report the position during the drag, but its end-of-session
+   callbacks cannot be trusted: neither `dropExited` nor `performDrop` is
+   guaranteed, and a stray `dropUpdated` can arrive *after* a drop. The insertion
+   line stayed on screen.
+3. Adding more places to clear it still left cases uncovered, ending in a watchdog
+   that clears the marker when updates stop arriving. It works, but inferring UI
+   state from a timer is a bad sign.
+4. Separately, the view body walked the whole shelf on every re-evaluation, which
+   froze the window mid-drag. Caching fixed that, but it exposed how poorly the
+   SwiftUI tree + drag-and-drop combination fits this job.
 
-**Drag to reorder (deferred at first, implemented 2026-07-26).** Shipping moves
-without reordering left the tree feeling half-draggable, so it was implemented.
-Ordering is expressed as a numeric filename prefix, so reordering necessarily
-**renames files**. The risk is contained as follows.
+**Continuing down this path means rewriting the tree on `NSOutlineView`**, and that
+investment is not worth it for this feature. Finder is already good at rearranging
+folders, and url-shelf exists to *open* things, not to manage files.
 
-- **The whole folder is renumbered** (`010_`, `020_`, …). Renumbering only part of
-  it cannot guarantee the order, because unprefixed files sort alphabetically among
-  themselves
-- The step is 10, leaving room to insert something by hand in Finder
-- Prefixes stay within **three digits**: four digits are indistinguishable from a
-  year, which `DisplayName` deliberately refuses to treat as ordering. Past 99 items
-  the step drops to 1; past 999 the reorder is refused
-- Renaming happens in **two phases** (everything to a hidden temporary name, then to
-  its final one) so that a swap like `010_A` ⇄ `020_B` cannot lose a file. If the
-  second phase fails, the temporaries are put back
-- Nothing is deleted. An order you dislike can be dragged again, or renamed in Finder
+## State after the reversal
 
-**A tab inside Settings (rejected).** Changing settings and editing data are
-different in kind — the same reason Add URL was split out of Settings.
+- The Shelf window, tree, inspector, drag and drop, reordering, and trash deletion
+  are gone
+- Creating, renaming, moving, and deleting folders and entries happens **in Finder**
+- A new entry's open mode and browser are set in the **Add URL** window
+- **An existing entry's metadata can no longer be changed from inside the app** —
+  hand-edit the `.webloc` plist or add it again. This is the one real capability the
+  reversal costs
+- Ordering stays as it was: a numeric filename prefix, adjusted by renaming in Finder
 
-**Menu right-click only (rejected).** Lightweight, but it cannot support
-reorganizing while looking at the whole tree.
+## What this taught us
 
-**An index or database of our own (rejected).** Adding an editor does not change
-which side is authoritative. Surviving edits made outside the app is the whole point
-of this tool.
-
-## Consequences
-
-- url-shelf becomes a launcher *and* a manager; the README's description changes
-- Using Finder alongside it keeps working — both routes produce the same result
-- Deleting through the Trash means a mistake is recoverable from Finder
-- File operations sit behind a `ShelfEditing` protocol so they stay unit-testable
+- Handling **the end of a drag session reliably is not practical** on SwiftUI's
+  `List` / `OutlineGroup`. If reordering with an insertion indicator is required,
+  start with `NSOutlineView`.
+- Never walk the filesystem from a view body. SwiftUI re-evaluates bodies often.
+- Before reimplementing what Finder already does, ask whether it is needed. The only
+  thing genuinely missing was **metadata editing**; the file operations came along
+  for the ride. A second attempt should start with a small window that edits one
+  entry, and no tree at all.
