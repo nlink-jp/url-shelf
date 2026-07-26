@@ -59,7 +59,7 @@ Sources/URLShelf/
     LoginItemManager.swift      SMAppService
     MiniTOML.swift              the TOML subset the config files need
   Views/
-    HostedWindow.swift          NSWindow + NSHostingView host; activation-policy counting
+    HostedWindow.swift          NSWindow + NSHostingView host; sizes to content, activation-policy counting
     SettingsView.swift          configuration only
     AddEntryView.swift          quick capture, clipboard prefill
     EditEntryView.swift         single-entry settings (Option-Command in the menu)
@@ -111,6 +111,8 @@ Resolution order: **entry > nearest ancestor folder > global config**
   ADR-0001 —
   SwiftUI's `List`/`OutlineGroup` cannot report the end of a drag session reliably,
   and the fix is `NSOutlineView`, not more callbacks.
+- **Windows size to `NSHostingView.fittingSize`**, not to a hardcoded height. A form
+  a few points too tall for its window gets a scroll bar and reads as broken.
 - **Never walk the filesystem from a view body.** SwiftUI re-evaluates bodies often
   enough that this froze the window during a drag.
 - Signing scripts under `scripts/` are vendored verbatim from

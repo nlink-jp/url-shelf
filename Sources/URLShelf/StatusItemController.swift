@@ -224,41 +224,6 @@ final class StatusItemController: NSObject {
         }
     }
 
-    /// The private browser is the one setting worth switching from the menu:
-    /// which browser an investigation should be isolated in changes with the
-    /// task, while the root and the normal browser are set once (in Settings).
-    private func privateBrowserMenuItem() -> NSMenuItem {
-        let item = NSMenuItem(title: "Private Browser", action: nil, keyEquivalent: "")
-        let submenu = NSMenu(title: item.title)
-
-        let candidates = model.inventory.privateCapableBrowsers()
-        if candidates.isEmpty {
-            submenu.addItem(disabledItem("No capable browser installed"))
-        }
-        for capability in candidates {
-            let entry = NSMenuItem(
-                title: capability.displayName,
-                action: #selector(selectPrivateBrowser(_:)),
-                keyEquivalent: "")
-            entry.target = self
-            entry.representedObject = capability.bundleID
-            entry.state = model.config.privateBrowser == capability.bundleID ? .on : .off
-            submenu.addItem(entry)
-        }
-
-        item.submenu = submenu
-        return item
-    }
-
-    @objc private func selectPrivateBrowser(_ sender: NSMenuItem) {
-        guard let bundleID = sender.representedObject as? String else { return }
-        do {
-            try model.setPrivateBrowser(bundleID)
-        } catch {
-            model.present(error)
-        }
-    }
-
     @objc private func openSettings() {
         settingsWindow.show()
     }
@@ -328,15 +293,13 @@ extension StatusItemController: NSMenuDelegate {
         if model.rootURL == nil {
             menu.addItem(disabledItem("Choose a shelf folder in Settings to begin"))
         } else if model.needsPrivateBrowserChoice {
-            menu.addItem(disabledItem("Private entries need a browser — choose one below"))
+            menu.addItem(disabledItem("Private entries need a browser — set one in Settings"))
         } else if model.inventory.privateCapableBrowsers().isEmpty {
             let warning = disabledItem("No private-capable browser installed")
             warning.toolTip = "Safari cannot be opened in a private window from another app. "
                 + "Install Firefox, Chrome, or Edge to use private entries."
             menu.addItem(warning)
         }
-
-        menu.addItem(privateBrowserMenuItem())
 
         if let root = model.rootURL {
             let reveal = NSMenuItem(

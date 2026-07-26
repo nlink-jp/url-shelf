@@ -54,7 +54,20 @@ final class HostedWindow: NSObject, NSWindowDelegate {
                 backing: .buffered,
                 defer: false)
             window.title = title
-            window.contentView = NSHostingView(rootView: content())
+
+            // Sized to the content rather than to a guess: a form that is a few
+            // points too tall for its window gets a scroll bar, which reads as a
+            // layout mistake. The given size is a minimum, and the screen a cap.
+            let hosting = NSHostingView(rootView: content())
+            window.contentView = hosting
+            hosting.layoutSubtreeIfNeeded()
+
+            let available = NSScreen.main?.visibleFrame.height ?? 900
+            let fitting = hosting.fittingSize
+            window.setContentSize(NSSize(
+                width: max(size.width, fitting.width),
+                height: min(max(size.height, fitting.height), available - 80)))
+
             window.isReleasedWhenClosed = false
             window.center()
             window.delegate = self
