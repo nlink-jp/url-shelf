@@ -60,8 +60,7 @@ struct FileSystemShelf: ShelfReading {
             return .entry(name: DisplayName.fromFilename(url.lastPathComponent), fileURL: url)
         }
 
-        // Sorted by filename, not display name, so an ordering prefix does its
-        // job. This is a stable base order; how it is presented is ShelfSort's.
+        // A stable base order; how it is presented is ShelfSort's business.
         return ShelfSort(grouping: .name, descending: false).apply(to: items)
     }
 

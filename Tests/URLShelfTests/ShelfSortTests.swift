@@ -43,16 +43,17 @@ final class ShelfSortTests: XCTestCase {
             ["work", "research", "Beta.webloc", "Alpha.webloc"])
     }
 
-    /// Numeric prefixes are read as numbers, so 2 comes before 10.
-    func testOrderingPrefixesCompareNaturally() {
+    /// Numbers in filenames are read as numbers, so 2 comes before 10.
+    func testNumbersCompareNaturally() {
         XCTAssertEqual(
             names(ShelfSort(grouping: .name, descending: false),
                   ["10_Ten.webloc", "2_Two.webloc", "1_One.webloc"]),
             ["1_One.webloc", "2_Two.webloc", "10_Ten.webloc"])
     }
 
-    /// The point of "Name only": a prefix can order a folder against an entry.
-    func testNameOnlyLetsAPrefixOutrankAFolder() {
+    /// The point of "Name only": a numbering scheme can order a folder against
+    /// an entry.
+    func testNameOnlyLetsANumberOutrankAFolder() {
         XCTAssertEqual(
             names(ShelfSort(grouping: .name, descending: false),
                   ["02_work", "01_Wiki.webloc"]),

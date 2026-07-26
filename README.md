@@ -33,8 +33,6 @@ opens it even if this app is gone. Nothing is locked into the tool.
 
 - Folders become submenus, `.webloc` files become menu items
 - The tree is rescanned each time the menu opens — no watcher, no stale state
-- Ordering prefixes in filenames (`01_`, `10 - `) sort the entries and are
-  stripped from the label
 - Hold **Option** while clicking to invert normal ⇄ private for that one click
 
 Per-entry settings live inside the `.webloc` plist under a reverse-DNS
@@ -69,11 +67,11 @@ Changes show up the next time a menu opens; nothing needs to be told.
 - **Add URL…** (Cmd-N) files a single URL, prefilled from the clipboard, and is
   where an entry's open mode and browser are chosen
 - Dropping a URL on the menu bar icon files it in the drop-target folder
-- Ordering comes from a numeric filename prefix (`01_`, `02_`), stripped from the
-  label — rename in Finder to reorder
 - Settings chooses how a folder's contents are grouped in the menu: folders first
-  (the default), entries first, or name only — plus the direction. With **Name
-  only**, a prefix can order a folder against an entry
+  (the default), entries first, or name only — plus the direction
+- Menu labels are the filenames, minus the extension. To force an order, number
+  the filenames (`01_…`) and pick **Name only**; numbers compare naturally, so
+  `2_` comes before `10_`
 - To change an existing entry's URL, open mode, or browser, hold **Command** and
   click it in the menu
 

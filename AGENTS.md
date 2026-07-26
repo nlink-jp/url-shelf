@@ -44,7 +44,7 @@ Sources/URLShelf/
   AppModel.swift                @MainActor orchestrator; config, plans, shelf mutations
   StatusItemController.swift    NSStatusItem + NSMenu; rebuilds the menu in menuNeedsUpdate
   Models/
-    DisplayName.swift           filename ⇄ menu label (ordering prefix, rename)
+    DisplayName.swift           filename → menu label (extension only)
     EntryNaming.swift           filename choice, sanitizing, collision counter
     OpenMode.swift              OpenMode / BrowserSelection / webloc key names
     ShelfSort.swift             menu grouping + direction (pure)
@@ -93,8 +93,9 @@ Resolution order: **entry > nearest ancestor folder > global config**
   modifier alternates: Option (invert mode), Command (settings), Option-Command
   (reveal in Finder) — ordered by how often each is reached. Doing better needs `NSMenuItem.view`, which forfeits alternates,
   highlighting, and keyboard handling.
-- **Ordering-prefix stripping is capped at 3 digits** so that names starting with
-  a year (`2026-07-26 notes.webloc`) are not mangled.
+- **Menu labels are filenames minus the extension**, nothing more. Stripping a
+  leading `01_` was tried and removed once ordering became a setting — a label that
+  differs from the filename makes Finder and the menu disagree.
 - **Argument forwarding works, but only with `createsNewApplicationInstance = true`**
   (measured 2026-07-26). With it, a transient process forwards the arguments to the
   running browser and exits. With `false`, Edge opened nothing and Chrome let the URL

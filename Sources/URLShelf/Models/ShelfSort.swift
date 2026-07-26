@@ -4,8 +4,8 @@ import Foundation
 enum ShelfGrouping: String, CaseIterable, Equatable, Hashable {
     case foldersFirst = "folders-first"
     case entriesFirst = "entries-first"
-    /// No grouping — a numeric filename prefix can then order folders and
-    /// entries against each other.
+    /// No grouping — folders and entries interleave by name, so a numbering
+    /// scheme can order them against each other.
     case name
 
     var displayName: String {
@@ -24,8 +24,8 @@ struct ShelfSort: Equatable, Hashable {
 
     static let `default` = ShelfSort(grouping: .foldersFirst, descending: false)
 
-    /// Names compare naturally, so `2_` sorts before `10_` — the ordering prefix
-    /// is meant to be read as a number.
+    /// Names compare naturally, so `2_` sorts before `10_` rather than after it:
+    /// a number in a filename is read as a number.
     ///
     /// `descending` reverses the name order only; folders stay on the side the
     /// grouping puts them, because flipping that too would make one setting mean

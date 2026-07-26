@@ -2,44 +2,13 @@ import Foundation
 
 /// Derives the label shown in the menu from a shelf filename.
 ///
-/// The filesystem is the canonical store, so menu ordering has to be expressed
-/// in the filenames themselves (`01_Wiki.webloc`, `02 - Expenses.webloc`). The
-/// prefix orders the entries but must not reach the menu.
+/// Only the extension goes: the filename is the name, exactly as Finder shows
+/// it. url-shelf once stripped a leading `01_` so that a numbering scheme could
+/// order the menu invisibly, but ordering is a setting now, and a label that
+/// silently differs from the filename is a small lie the app has no reason to
+/// tell.
 enum DisplayName {
-    /// Maximum digits treated as an ordering prefix. Kept short so that names
-    /// legitimately starting with a year (`2026-07-26 notes.webloc`) survive
-    /// intact — a 4-digit run is a date, not a sort key.
-    private static let maxPrefixDigits = 3
-
-    private static let separators: Set<Character> = [" ", "_", "-", "."]
-
-    /// Strips the path extension and any ordering prefix.
     static func fromFilename(_ filename: String) -> String {
-        strippingOrderPrefix((filename as NSString).deletingPathExtension)
-    }
-
-    /// Removes a leading `<digits><separator(s)>` run from an extension-less name.
-    /// Returns the input unchanged when the result would be empty or when the
-    /// digit run is too long to be a sort key.
-    static func strippingOrderPrefix(_ stem: String) -> String {
-        String(stem.dropFirst(orderPrefix(of: stem).count))
-    }
-
-    /// The leading `<digits><separator(s)>` run, or `""` when there is none.
-    static func orderPrefix(of stem: String) -> String {
-        var rest = Substring(stem)
-
-        let digits = rest.prefix(while: \.isNumber)
-        guard !digits.isEmpty, digits.count <= maxPrefixDigits else { return "" }
-        rest = rest.dropFirst(digits.count)
-
-        var separatorCount = 0
-        while let c = rest.first, separators.contains(c) {
-            rest = rest.dropFirst()
-            separatorCount += 1
-        }
-
-        guard separatorCount > 0, !rest.isEmpty else { return "" }
-        return String(stem.dropLast(rest.count))
+        (filename as NSString).deletingPathExtension
     }
 }

@@ -55,22 +55,24 @@ final class ShelfStoreTests: XCTestCase {
         XCTAssertEqual(try shelf.children(of: root).map(\.name), ["Visible"])
     }
 
-    func testSortsByFilenameSoOrderingPrefixesWork() throws {
+    func testSortsNumbersNaturally() throws {
         try makeEntry("10_Ten.webloc")
         try makeEntry("2_Two.webloc")
         try makeEntry("1_One.webloc")
 
-        // Natural ordering: 1, 2, 10 — not lexicographic 1, 10, 2.
-        XCTAssertEqual(try shelf.children(of: root).map(\.name), ["One", "Two", "Ten"])
+        // Natural ordering: 1, 2, 10 — not lexicographic 1, 10, 2. Numbers in a
+        // filename stay in the label; they are part of the name.
+        XCTAssertEqual(try shelf.children(of: root).map(\.name), ["1_One", "2_Two", "10_Ten"])
     }
 
-    func testFoldersAndEntriesInterleaveByPrefix() throws {
+    func testFoldersAndEntriesShareOneOrderBeforeGrouping() throws {
         try makeFolder("2_Research")
         try makeEntry("1_Wiki.webloc")
         try makeEntry("3_Expenses.webloc")
 
         XCTAssertEqual(
-            try shelf.children(of: root).map(\.name), ["Wiki", "Research", "Expenses"])
+            try shelf.children(of: root).map(\.name),
+            ["1_Wiki", "2_Research", "3_Expenses"])
     }
 
     func testChildrenIsOneLevelOnly() throws {
