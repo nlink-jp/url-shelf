@@ -16,6 +16,11 @@ enum ShelfItem: Equatable {
         case .folder(_, let url), .entry(_, let url): return url
         }
     }
+
+    var isFolder: Bool {
+        if case .folder = self { return true }
+        return false
+    }
 }
 
 protocol ShelfReading {
@@ -55,12 +60,9 @@ struct FileSystemShelf: ShelfReading {
             return .entry(name: DisplayName.fromFilename(url.lastPathComponent), fileURL: url)
         }
 
-        // Sorted by filename, not display name, so the ordering prefix does its
-        // job. Folders and entries interleave — the user's numbering decides.
-        return items.sorted {
-            $0.url.lastPathComponent
-                .localizedStandardCompare($1.url.lastPathComponent) == .orderedAscending
-        }
+        // Sorted by filename, not display name, so an ordering prefix does its
+        // job. This is a stable base order; how it is presented is ShelfSort's.
+        return ShelfSort(grouping: .name, descending: false).apply(to: items)
     }
 
     func defaults(at folder: URL) -> FolderDefaults {

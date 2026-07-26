@@ -10,6 +10,7 @@ struct AppConfig: Equatable {
     var rootPath: String?
     /// Folder (relative to the root) that receives dropped URLs. Empty = the root.
     var inbox: String
+    var sort: ShelfSort
     var normalBrowser: BrowserSelection
     /// Bundle ID of the browser used for private entries. `nil` when unset — in
     /// that state private entries are shown disabled rather than downgraded.
@@ -18,6 +19,7 @@ struct AppConfig: Equatable {
     static let `default` = AppConfig(
         rootPath: nil,
         inbox: "",
+        sort: .default,
         normalBrowser: .systemDefault,
         privateBrowser: nil)
 
@@ -40,6 +42,10 @@ struct AppConfig: Equatable {
         return AppConfig(
             rootPath: shelf["root"].flatMap { $0.isEmpty ? nil : $0 },
             inbox: shelf["inbox"] ?? "",
+            sort: ShelfSort(
+                grouping: shelf["sort"].flatMap(ShelfGrouping.init(rawValue:))
+                    ?? ShelfSort.default.grouping,
+                descending: shelf["order"] == "descending"),
             normalBrowser: BrowserSelection(configValue: browser["normal"] ?? "default"),
             privateBrowser: browser["private"].flatMap { $0.isEmpty ? nil : $0 })
     }
@@ -49,6 +55,8 @@ struct AppConfig: Equatable {
         [shelf]
         root    = \(MiniTOML.quote(rootPath ?? ""))
         inbox   = \(MiniTOML.quote(inbox))
+        sort    = \(MiniTOML.quote(sort.grouping.rawValue))
+        order   = \(MiniTOML.quote(sort.descending ? "descending" : "ascending"))
 
         [browser]
         normal  = \(MiniTOML.quote(normalBrowser.configValue))

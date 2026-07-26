@@ -92,7 +92,7 @@ final class StatusItemController: NSObject {
 
     private func populate(_ menu: NSMenu, from folder: URL) {
         do {
-            let items = try model.shelf.children(of: folder)
+            let items = model.config.sort.apply(to: try model.shelf.children(of: folder))
             if items.isEmpty {
                 menu.addItem(disabledItem("(empty)"))
             }

@@ -122,9 +122,27 @@ final class AppConfigTests: XCTestCase {
         let original = AppConfig(
             rootPath: "~/Documents/URL Shelf",
             inbox: "inbox",
+            sort: ShelfSort(grouping: .entriesFirst, descending: true),
             normalBrowser: .bundleID("com.google.Chrome"),
             privateBrowser: "org.mozilla.firefox")
         XCTAssertEqual(AppConfig.parse(original.serialized()), original)
+    }
+
+    func testSortDefaultsWhenAbsentOrUnknown() {
+        XCTAssertEqual(AppConfig.parse("").sort, .default)
+        XCTAssertEqual(AppConfig.parse("""
+        [shelf]
+        sort = "sideways"
+        """).sort, .default)
+    }
+
+    func testParsesSortSettings() {
+        let config = AppConfig.parse("""
+        [shelf]
+        sort  = "entries-first"
+        order = "descending"
+        """)
+        XCTAssertEqual(config.sort, ShelfSort(grouping: .entriesFirst, descending: true))
     }
 
     func testRootURLExpandsTilde() {

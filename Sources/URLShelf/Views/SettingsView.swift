@@ -29,6 +29,23 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
             }
 
+            Section("Menu order") {
+                Picker("Group", selection: groupingBinding) {
+                    ForEach(ShelfGrouping.allCases, id: \.self) { grouping in
+                        Text(grouping.displayName).tag(grouping)
+                    }
+                }
+                Picker("Direction", selection: descendingBinding) {
+                    Text("Ascending").tag(false)
+                    Text("Descending").tag(true)
+                }
+                Text("Sorted by filename, so a numeric prefix (01_, 02_) orders entries "
+                     + "explicitly. \"Name only\" lets a prefix order folders and entries "
+                     + "against each other.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
             Section("Browsers") {
                 Picker("Normal entries", selection: normalBrowserBinding) {
                     Text("System Default").tag(BrowserSelection.systemDefault)
@@ -95,6 +112,24 @@ struct SettingsView: View {
         Binding(
             get: { model.config.inbox },
             set: { value in perform { try model.setInbox(value) } })
+    }
+
+    private var groupingBinding: Binding<ShelfGrouping> {
+        Binding(
+            get: { model.config.sort.grouping },
+            set: { value in
+                perform { try model.setSort(ShelfSort(
+                    grouping: value, descending: model.config.sort.descending)) }
+            })
+    }
+
+    private var descendingBinding: Binding<Bool> {
+        Binding(
+            get: { model.config.sort.descending },
+            set: { value in
+                perform { try model.setSort(ShelfSort(
+                    grouping: model.config.sort.grouping, descending: value)) }
+            })
     }
 
     private var normalBrowserBinding: Binding<BrowserSelection> {

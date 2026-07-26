@@ -7,6 +7,7 @@ final class MetadataResolverTests: XCTestCase {
     private let config = AppConfig(
         rootPath: nil,
         inbox: "",
+        sort: .default,
         normalBrowser: .bundleID("com.apple.Safari"),
         privateBrowser: "org.mozilla.firefox")
 

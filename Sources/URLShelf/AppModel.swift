@@ -39,6 +39,12 @@ final class AppModel: ObservableObject {
         try config.write(to: configURL)
     }
 
+    func setSort(_ sort: ShelfSort) throws {
+        config.sort = sort
+        try config.write(to: configURL)
+        didChangeShelf()
+    }
+
     func setInbox(_ path: String) throws {
         config.inbox = path
         try config.write(to: configURL)

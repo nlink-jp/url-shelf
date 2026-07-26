@@ -71,6 +71,9 @@ Changes show up the next time a menu opens; nothing needs to be told.
 - Dropping a URL on the menu bar icon files it in the drop-target folder
 - Ordering comes from a numeric filename prefix (`01_`, `02_`), stripped from the
   label — rename in Finder to reorder
+- Settings chooses how a folder's contents are grouped in the menu: folders first
+  (the default), entries first, or name only — plus the direction. With **Name
+  only**, a prefix can order a folder against an entry
 - To change an existing entry's URL, open mode, or browser, hold **Command** and
   click it in the menu
 
@@ -89,6 +92,8 @@ only the single-entry editor kept.
 [shelf]
 root    = "~/Documents/URL Shelf"
 inbox   = ""                      # drop target for drag & drop; empty = root
+sort    = "folders-first"         # "folders-first" | "entries-first" | "name"
+order   = "ascending"             # "ascending" | "descending"
 
 [browser]
 normal  = "default"               # "default" = system default, or a bundle ID

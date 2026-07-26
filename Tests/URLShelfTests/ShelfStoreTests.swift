@@ -103,7 +103,7 @@ final class ShelfStoreTests: XCTestCase {
         let plan = MetadataResolver.resolve(
             entryMode: nil, entryBrowser: nil, folderChain: chain,
             config: AppConfig(
-                rootPath: nil, inbox: "", normalBrowser: .systemDefault,
+                rootPath: nil, inbox: "", sort: .default, normalBrowser: .systemDefault,
                 privateBrowser: "org.mozilla.firefox"))
         XCTAssertEqual(
             plan, OpenPlan(mode: .privateWindow, browser: .bundleID("org.mozilla.firefox")))

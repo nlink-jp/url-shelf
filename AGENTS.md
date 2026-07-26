@@ -47,6 +47,7 @@ Sources/URLShelf/
     DisplayName.swift           filename ⇄ menu label (ordering prefix, rename)
     EntryNaming.swift           filename choice, sanitizing, collision counter
     OpenMode.swift              OpenMode / BrowserSelection / webloc key names
+    ShelfSort.swift             menu grouping + direction (pure)
     WeblocFile.swift            plist read/write, foreign keys preserved
     FolderDefaults.swift        .url-shelf.toml model
     AppConfig.swift             ~/.config/url-shelf/config.toml model
