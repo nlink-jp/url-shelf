@@ -1,7 +1,7 @@
 # RFP: url-shelf
 
 > Generated: 2026-07-26
-> Status: Draft
+> Status: Draft (amended twice by implementation — see Amendments)
 
 ## 1. Problem Statement
 
@@ -286,6 +286,25 @@ GUIs (share-mounter, quick-translate, instant-translate, load-spinner).
 - **macOS 13+, darwin/arm64 only** — driven by the SMAppService requirement
 - **Gatekeeper** — notarization and stapling are mandatory; the Homebrew tap uses the
   prebuilt-binary form to preserve the signature
+
+---
+
+## Amendments from implementation
+
+Two things changed once the tool was built and used.
+
+**Ordering prefixes dropped (2026-07-26).** The original design stripped a numeric
+filename prefix (`01_`) from menu labels so that order could be expressed
+invisibly. Once grouping (folders first / entries first / name only) and direction
+became settings, the special treatment bought nothing and cost something: a label
+that disagrees with the name Finder shows. **Menu labels are now the filename minus
+the extension.** To force an order, number the filenames and choose "Name only".
+
+**A shelf editor was added and reversed (2026-07-26).** A Shelf window with a tree
+and an inspector was implemented and then removed; the interaction never became
+good enough. See [ADR-0001](adr-0001-shelf-management.md) for the reasoning and what
+it taught. What remains is **editing one entry's settings** (URL, open mode,
+browser) via Command-click in the menu. File operations belong to Finder.
 
 ---
 
