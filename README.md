@@ -71,8 +71,8 @@ settings stored *inside* a `.webloc`.
 - **Add URL…** (Cmd-N) files a single URL, prefilled from the clipboard
 - Dropping a URL on the menu bar icon files it in the drop-target folder
 - Deleting moves to the **Trash**, so a mistake is recoverable from Finder
-- Entries and folders are **dragged within the tree**: onto a folder to move into
-  it, onto a row's edge to reorder. A URL dragged in from a browser is filed
+- Entries and folders are **dragged within the tree**: a line shows where the item
+  will land, a highlight shows the folder it will go into. A URL dragged in from a browser is filed
   straight into the folder it lands on
 - Reordering renumbers that folder's filenames (`010_`, `020_`, …), because the
   order *is* the filenames — nothing records positions behind your back

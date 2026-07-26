@@ -101,6 +101,12 @@ Resolution order: **entry > nearest ancestor folder > global config**
 - **Safari cannot be driven into a private window** from outside. Do not add UI
   scripting (Cmd+Shift+N) as a workaround — it needs Accessibility permission and
   breaks across OS updates.
+- **`DropDelegate`, not `.dropDestination`** in the Shelf tree. `dropDestination`
+  reports the pointer position only at the moment of the drop, so it cannot show an
+  insertion line; `DropDelegate.dropUpdated` reports it throughout the drag.
+- **Reordering renames every sibling in the folder**, subfolders included, because
+  the order is the filenames. Two-phase rename through hidden temporary names, so a
+  swap cannot collide. Prefixes stay ≤3 digits (4 reads as a year).
 - Signing scripts under `scripts/` are vendored verbatim from
   `nlink-jp/.github/templates/`; `check-org.sh` flags any drift.
 

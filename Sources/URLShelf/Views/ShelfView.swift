@@ -13,7 +13,7 @@ struct ShelfView: View {
     @State private var selection: String?
     @State private var errorMessage: String?
     @State private var pendingDeletion: ShelfNode?
-    @State private var dropTarget: String?
+    @State private var hover: DropHover?
 
     var body: some View {
         HSplitView {
@@ -85,52 +85,45 @@ struct ShelfView: View {
     private func row(for node: ShelfNode) -> some View {
         ShelfRow(
             node: node,
-            highlighted: dropTarget == node.id,
-            onTargeted: { dropTarget = $0 ? node.id : nil },
-            onDrop: { urls, point, height in accept(urls, onto: node, y: point.y, height: height) })
+            isRoot: node.url == model.rootURL,
+            hover: hover?.id == node.id ? hover?.position : nil,
+            onHover: { position in
+                hover = position.map { DropHover(id: node.id, position: $0) }
+            },
+            onDrop: { urls, position in accept(urls, onto: node, position: position) })
     }
 
-    private func accept(_ urls: [URL], onto node: ShelfNode, y: CGFloat, height: CGFloat) -> Bool {
-        guard let root = model.rootURL, height > 0 else { return false }
+    private func accept(_ urls: [URL], onto node: ShelfNode, position: DropPosition) {
+        guard let root = model.rootURL else { return }
 
-        // The root has no siblings to sit between, so a drop on it can only mean
-        // "into".
-        let position = node.url == root
-            ? .into
-            : DropPosition.from(relativeY: Double(y / height), isFolder: node.isFolder)
-
-        var handled = false
         for url in urls {
             switch DropRouter.action(
                 for: url, onto: node.url, position: position, shelfRoot: root) {
             case .move(let source):
-                handled = apply { try model.drop(source, position, relativeTo: node.url) } || handled
+                apply { try model.drop(source, position, relativeTo: node.url) }
 
             case .addEntry(let webURL):
                 let folder = position == .into ? node.url : node.url.deletingLastPathComponent()
-                handled = apply {
+                apply {
                     let added = try model.addEntry(url: webURL, in: folder)
                     return position == .into
                         ? added
                         : try model.drop(added, position, relativeTo: node.url)
-                } || handled
+                }
 
             case .reject:
                 continue
             }
         }
-        return handled
     }
 
     /// Runs a shelf mutation and follows the result with the selection.
-    private func apply(_ work: () throws -> URL) -> Bool {
+    private func apply(_ work: () throws -> URL) {
         do {
             selection = try work().path
             errorMessage = nil
-            return true
         } catch {
             errorMessage = AppModel.describe(error)
-            return false
         }
     }
 
@@ -442,17 +435,23 @@ private struct FolderPicker: View {
     }
 }
 
+struct DropHover: Equatable {
+    let id: String
+    let position: DropPosition
+}
+
 /// One row of the tree.
 ///
-/// The row measures itself so that a drop can be resolved to before / into /
-/// after. SwiftUI reports the pointer position only when the drop happens, not
-/// during the drag, so the highlight marks the row rather than the exact
-/// insertion point.
+/// Uses `DropDelegate` rather than `dropDestination` because only the former
+/// reports the pointer position *during* the drag. Without it there is no way to
+/// show where the item would land, and a drop that silently picks before or
+/// after is worse than not dragging at all.
 private struct ShelfRow: View {
     let node: ShelfNode
-    let highlighted: Bool
-    var onTargeted: (Bool) -> Void
-    var onDrop: ([URL], CGPoint, CGFloat) -> Bool
+    let isRoot: Bool
+    let hover: DropPosition?
+    var onHover: (DropPosition?) -> Void
+    var onDrop: ([URL], DropPosition) -> Void
 
     @State private var height: CGFloat = 22
 
@@ -466,11 +465,88 @@ private struct ShelfRow: View {
                         .onAppear { height = proxy.size.height }
                         .onChange(of: proxy.size.height) { height = $0 }
                 })
-            .background(highlighted ? Color.accentColor.opacity(0.22) : Color.clear)
+            .background(hover == .into ? Color.accentColor.opacity(0.22) : Color.clear)
+            .overlay(alignment: .top) { insertionLine(shown: hover == .before) }
+            .overlay(alignment: .bottom) { insertionLine(shown: hover == .after) }
             .tag(node.id)
-            .draggable(node.url)
-            .dropDestination(for: URL.self) { urls, point in
-                onDrop(urls, point, height)
-            } isTargeted: { onTargeted($0) }
+            .onDrag { NSItemProvider(object: node.url as NSURL) }
+            .onDrop(
+                of: [.url, .fileURL],
+                delegate: RowDropDelegate(
+                    isFolder: node.isFolder,
+                    isRoot: isRoot,
+                    rowHeight: height,
+                    onHover: onHover,
+                    onDrop: onDrop))
+    }
+
+    @ViewBuilder
+    private func insertionLine(shown: Bool) -> some View {
+        Rectangle()
+            .fill(Color.accentColor)
+            .frame(height: 2)
+            .opacity(shown ? 1 : 0)
+    }
+}
+
+private struct RowDropDelegate: DropDelegate {
+    let isFolder: Bool
+    let isRoot: Bool
+    let rowHeight: CGFloat
+    let onHover: (DropPosition?) -> Void
+    let onDrop: ([URL], DropPosition) -> Void
+
+    func validateDrop(info: DropInfo) -> Bool {
+        info.hasItemsConforming(to: [.url, .fileURL])
+    }
+
+    func dropEntered(info: DropInfo) {
+        onHover(position(for: info))
+    }
+
+    func dropUpdated(info: DropInfo) -> DropProposal? {
+        onHover(position(for: info))
+        return DropProposal(operation: .move)
+    }
+
+    func dropExited(info: DropInfo) {
+        onHover(nil)
+    }
+
+    func performDrop(info: DropInfo) -> Bool {
+        let position = position(for: info)
+        onHover(nil)
+        load(from: info) { urls in
+            guard !urls.isEmpty else { return }
+            onDrop(urls, position)
+        }
+        return true
+    }
+
+    /// The root has no siblings to sit between, so a drop on it can only mean
+    /// "into".
+    private func position(for info: DropInfo) -> DropPosition {
+        guard !isRoot, rowHeight > 0 else { return .into }
+        return DropPosition.from(
+            relativeY: Double(info.location.y / rowHeight), isFolder: isFolder)
+    }
+
+    /// Item providers resolve asynchronously, so the drop is accepted first and
+    /// acted on once the URLs arrive.
+    private func load(from info: DropInfo, completion: @escaping ([URL]) -> Void) {
+        let providers = info.itemProviders(for: [.url, .fileURL])
+        guard !providers.isEmpty else { return }
+
+        var loaded = [URL?](repeating: nil, count: providers.count)
+        let group = DispatchGroup()
+
+        for (index, provider) in providers.enumerated() {
+            group.enter()
+            _ = provider.loadObject(ofClass: URL.self) { url, _ in
+                loaded[index] = url
+                group.leave()
+            }
+        }
+        group.notify(queue: .main) { completion(loaded.compactMap { $0 }) }
     }
 }
