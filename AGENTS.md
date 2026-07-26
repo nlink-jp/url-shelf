@@ -86,8 +86,8 @@ Resolution order: **entry > nearest ancestor folder > global config**
   the alternate items, and drag-and-drop onto the status item.
 - **An `NSMenu` does not deliver right-clicks to its items**, and a submenu stops the
   parent item's action from firing at all. Per-entry actions therefore ride on
-  modifier alternates: Option (invert mode), Command (reveal), Option-Command
-  (settings). Doing better needs `NSMenuItem.view`, which forfeits alternates,
+  modifier alternates: Option (invert mode), Command (settings), Option-Command
+  (reveal in Finder) — ordered by how often each is reached. Doing better needs `NSMenuItem.view`, which forfeits alternates,
   highlighting, and keyboard handling.
 - **Ordering-prefix stripping is capped at 3 digits** so that names starting with
   a year (`2026-07-26 notes.webloc`) are not mangled.

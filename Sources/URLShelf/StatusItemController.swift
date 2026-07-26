@@ -148,22 +148,8 @@ final class StatusItemController: NSObject {
         alternate.isAlternate = true
         menu.addItem(alternate)
 
-        // A second alternate on Command: the file behind an entry has to be
-        // reachable, since the filesystem is where the shelf is actually edited.
-        let reveal = NSMenuItem(
-            title: "\(name) (Reveal in Finder)",
-            action: #selector(revealInFinder(_:)),
-            keyEquivalent: "")
-        reveal.target = self
-        reveal.representedObject = EntryTarget(
-            fileURL: fileURL, folderURL: folder, useInverted: false)
-        reveal.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
-        reveal.keyEquivalentModifierMask = .command
-        reveal.isAlternate = true
-        menu.addItem(reveal)
-
-        // Option+Command: the open mode and browser live inside the .webloc, so
-        // this is the one edit Finder cannot make.
+        // Command: the open mode and browser live inside the .webloc, so this is
+        // the one edit Finder cannot make — and the one reached most often.
         let edit = NSMenuItem(
             title: "\(name) (Settings…)",
             action: #selector(editEntry(_:)),
@@ -172,9 +158,23 @@ final class StatusItemController: NSObject {
         edit.representedObject = EntryTarget(
             fileURL: fileURL, folderURL: folder, useInverted: false)
         edit.image = NSImage(systemSymbolName: "slider.horizontal.3", accessibilityDescription: nil)
-        edit.keyEquivalentModifierMask = [.option, .command]
+        edit.keyEquivalentModifierMask = .command
         edit.isAlternate = true
         menu.addItem(edit)
+
+        // Option+Command: renaming and moving happen in Finder, which is a rarer
+        // errand than changing how an entry opens.
+        let reveal = NSMenuItem(
+            title: "\(name) (Reveal in Finder)",
+            action: #selector(revealInFinder(_:)),
+            keyEquivalent: "")
+        reveal.target = self
+        reveal.representedObject = EntryTarget(
+            fileURL: fileURL, folderURL: folder, useInverted: false)
+        reveal.image = NSImage(systemSymbolName: "folder", accessibilityDescription: nil)
+        reveal.keyEquivalentModifierMask = [.option, .command]
+        reveal.isAlternate = true
+        menu.addItem(reveal)
     }
 
     private func entryItem(
