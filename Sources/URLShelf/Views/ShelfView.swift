@@ -11,9 +11,12 @@ struct ShelfView: View {
     @ObservedObject var model: AppModel
 
     @State private var selection: String?
+    /// Cached deliberately: `model.tree()` walks the whole folder, and a view
+    /// body runs on every hover change during a drag. Refreshed from the model's
+    /// revision, which every mutation bumps.
+    @State private var tree: ShelfNode?
     @State private var errorMessage: String?
     @State private var pendingDeletion: ShelfNode?
-    @State private var hover: DropHover?
 
     var body: some View {
         HSplitView {
@@ -23,6 +26,13 @@ struct ShelfView: View {
                 .frame(minWidth: 300)
         }
         .frame(minWidth: 620, minHeight: 420)
+        .onAppear(perform: reloadTree)
+        .onChange(of: model.revision) { _ in reloadTree() }
+        // Coming back to the window is the moment to notice edits made in Finder
+        // while it was in the background.
+        .onReceive(NotificationCenter.default.publisher(for: NSWindow.didBecomeKeyNotification)) {
+            _ in reloadTree()
+        }
         .alert(item: $pendingDeletion) { node in
             Alert(
                 title: Text("Move “\(node.name)” to the Trash?"),
@@ -38,7 +48,7 @@ struct ShelfView: View {
 
     private var treePane: some View {
         VStack(spacing: 0) {
-            if let tree = model.tree() {
+            if let tree {
                 List(selection: $selection) {
                     OutlineGroup([tree], children: \.children) { node in
                         row(for: node)
@@ -86,10 +96,6 @@ struct ShelfView: View {
         ShelfRow(
             node: node,
             isRoot: node.url == model.rootURL,
-            hover: hover?.id == node.id ? hover?.position : nil,
-            onHover: { position in
-                hover = position.map { DropHover(id: node.id, position: $0) }
-            },
             onDrop: { urls, position in accept(urls, onto: node, position: position) })
     }
 
@@ -160,8 +166,12 @@ struct ShelfView: View {
 
     // MARK: - Actions
 
+    private func reloadTree() {
+        tree = model.tree()
+    }
+
     private var selectedNode: ShelfNode? {
-        guard let selection, let tree = model.tree() else { return nil }
+        guard let selection, let tree else { return nil }
         return Self.find(selection, in: tree)
     }
 
@@ -435,11 +445,6 @@ private struct FolderPicker: View {
     }
 }
 
-struct DropHover: Equatable {
-    let id: String
-    let position: DropPosition
-}
-
 /// One row of the tree.
 ///
 /// Uses `DropDelegate` rather than `dropDestination` because only the former
@@ -449,10 +454,11 @@ struct DropHover: Equatable {
 private struct ShelfRow: View {
     let node: ShelfNode
     let isRoot: Bool
-    let hover: DropPosition?
-    var onHover: (DropPosition?) -> Void
     var onDrop: ([URL], DropPosition) -> Void
 
+    /// Owned by the row rather than the tree: the pointer moving over one row
+    /// must repaint that row, not re-evaluate every other one.
+    @State private var hover: DropPosition?
     @State private var height: CGFloat = 22
 
     var body: some View {
@@ -476,7 +482,7 @@ private struct ShelfRow: View {
                     isFolder: node.isFolder,
                     isRoot: isRoot,
                     rowHeight: height,
-                    onHover: onHover,
+                    onHover: { hover = $0 },
                     onDrop: onDrop))
     }
 

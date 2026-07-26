@@ -139,7 +139,20 @@ final class AppModel: ObservableObject {
 
     /// Every folder under the root, depth-first, for the destination picker.
     /// Returned paths are relative to the root; the root itself is `""`.
+    ///
+    /// Memoized per revision: pickers call this from their view bodies, and it
+    /// walks the whole folder.
     func folderPaths() -> [String] {
+        if let cached = cachedFolderPaths, cached.revision == revision { return cached.paths }
+
+        let paths = walkFolderPaths()
+        cachedFolderPaths = (revision, paths)
+        return paths
+    }
+
+    private var cachedFolderPaths: (revision: Int, paths: [String])?
+
+    private func walkFolderPaths() -> [String] {
         guard let root = rootURL else { return [] }
         var paths = [""]
 
