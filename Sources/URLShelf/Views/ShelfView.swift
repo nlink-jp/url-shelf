@@ -15,6 +15,11 @@ struct ShelfView: View {
     /// body runs on every hover change during a drag. Refreshed from the model's
     /// revision, which every mutation bumps.
     @State private var tree: ShelfNode?
+    /// Which row shows an insertion marker, held here rather than per row.
+    /// `dropExited` is not guaranteed when a drag session ends, so a row cannot
+    /// be relied on to clear itself — with one shared value the next
+    /// `dropEntered` overwrites whatever was left behind.
+    @State private var hover: DropHover?
     @State private var errorMessage: String?
     @State private var pendingDeletion: ShelfNode?
 
@@ -96,7 +101,14 @@ struct ShelfView: View {
         ShelfRow(
             node: node,
             isRoot: node.url == model.rootURL,
-            onDrop: { urls, position in accept(urls, onto: node, position: position) })
+            hover: hover?.id == node.id ? hover?.position : nil,
+            onHover: { position in
+                hover = position.map { DropHover(id: node.id, position: $0) }
+            },
+            onDrop: { urls, position in
+                hover = nil
+                accept(urls, onto: node, position: position)
+            })
     }
 
     private func accept(_ urls: [URL], onto node: ShelfNode, position: DropPosition) {
@@ -168,6 +180,7 @@ struct ShelfView: View {
 
     private func reloadTree() {
         tree = model.tree()
+        hover = nil
     }
 
     private var selectedNode: ShelfNode? {
@@ -445,6 +458,11 @@ private struct FolderPicker: View {
     }
 }
 
+struct DropHover: Equatable {
+    let id: String
+    let position: DropPosition
+}
+
 /// One row of the tree.
 ///
 /// Uses `DropDelegate` rather than `dropDestination` because only the former
@@ -454,11 +472,10 @@ private struct FolderPicker: View {
 private struct ShelfRow: View {
     let node: ShelfNode
     let isRoot: Bool
+    let hover: DropPosition?
+    var onHover: (DropPosition?) -> Void
     var onDrop: ([URL], DropPosition) -> Void
 
-    /// Owned by the row rather than the tree: the pointer moving over one row
-    /// must repaint that row, not re-evaluate every other one.
-    @State private var hover: DropPosition?
     @State private var height: CGFloat = 22
 
     var body: some View {
@@ -475,14 +492,20 @@ private struct ShelfRow: View {
             .overlay(alignment: .top) { insertionLine(shown: hover == .before) }
             .overlay(alignment: .bottom) { insertionLine(shown: hover == .after) }
             .tag(node.id)
-            .onDrag { NSItemProvider(object: node.url as NSURL) }
+            .onDrag {
+                // A cancelled session delivers neither dropExited nor
+                // performDrop, so the start of the next drag is the reliable
+                // moment to clear a marker left behind by the last one.
+                onHover(nil)
+                return NSItemProvider(object: node.url as NSURL)
+            }
             .onDrop(
                 of: [.url, .fileURL],
                 delegate: RowDropDelegate(
                     isFolder: node.isFolder,
                     isRoot: isRoot,
                     rowHeight: height,
-                    onHover: { hover = $0 },
+                    onHover: onHover,
                     onDrop: onDrop))
     }
 
