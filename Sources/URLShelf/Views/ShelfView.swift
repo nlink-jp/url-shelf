@@ -15,11 +15,15 @@ struct ShelfView: View {
     /// body runs on every hover change during a drag. Refreshed from the model's
     /// revision, which every mutation bumps.
     @State private var tree: ShelfNode?
-    /// Which row shows an insertion marker, held here rather than per row.
-    /// `dropExited` is not guaranteed when a drag session ends, so a row cannot
-    /// be relied on to clear itself — with one shared value the next
-    /// `dropEntered` overwrites whatever was left behind.
+    /// Which row shows an insertion marker.
+    ///
+    /// Cleared by a watchdog rather than by an end-of-drag callback: neither
+    /// `dropExited` nor `performDrop` is guaranteed to arrive when a session
+    /// ends, and a stray `dropUpdated` can arrive *after* a drop. Since
+    /// `dropUpdated` repeats while a drag is over a row, "no update for a
+    /// moment" is the one dependable signal that the drag is over.
     @State private var hover: DropHover?
+    @State private var hoverToken = 0
     @State private var errorMessage: String?
     @State private var pendingDeletion: ShelfNode?
 
@@ -103,10 +107,10 @@ struct ShelfView: View {
             isRoot: node.url == model.rootURL,
             hover: hover?.id == node.id ? hover?.position : nil,
             onHover: { position in
-                hover = position.map { DropHover(id: node.id, position: $0) }
+                setHover(position.map { DropHover(id: node.id, position: $0) })
             },
             onDrop: { urls, position in
-                hover = nil
+                setHover(nil)
                 accept(urls, onto: node, position: position)
             })
     }
@@ -180,7 +184,21 @@ struct ShelfView: View {
 
     private func reloadTree() {
         tree = model.tree()
-        hover = nil
+        setHover(nil)
+    }
+
+    /// Shows the marker and arms a watchdog. Each update supersedes the previous
+    /// one, so the timer only ever fires for the last position — which is
+    /// exactly the one left stranded when the drag stops reporting.
+    private func setHover(_ next: DropHover?) {
+        hover = next
+        hoverToken += 1
+        guard next != nil else { return }
+
+        let token = hoverToken
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            if hoverToken == token { hover = nil }
+        }
     }
 
     private var selectedNode: ShelfNode? {
@@ -493,9 +511,6 @@ private struct ShelfRow: View {
             .overlay(alignment: .bottom) { insertionLine(shown: hover == .after) }
             .tag(node.id)
             .onDrag {
-                // A cancelled session delivers neither dropExited nor
-                // performDrop, so the start of the next drag is the reliable
-                // moment to clear a marker left behind by the last one.
                 onHover(nil)
                 return NSItemProvider(object: node.url as NSURL)
             }
