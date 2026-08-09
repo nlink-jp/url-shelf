@@ -5,9 +5,7 @@ files on disk. The folder tree **is** the classification: whatever you see in
 Finder is what you see in the menu. Entries can be marked to open in a **private
 window**, so URLs under investigation never touch your normal session.
 
-> **Status: in development, not yet released.** The shelf works; packaging and
-> release are not done. See [docs/en/url-shelf-rfp.md](docs/en/url-shelf-rfp.md)
-> for the design.
+See [docs/en/url-shelf-rfp.md](docs/en/url-shelf-rfp.md) for the design.
 
 Japanese: [README.ja.md](README.ja.md)
 
@@ -111,8 +109,6 @@ make package    # notarize + staple + zip the release asset
 Requires macOS 13 or later on Apple Silicon.
 
 ## Install
-
-Not yet released. Once published:
 
 ```sh
 brew install --cask nlink-jp/tap/url-shelf

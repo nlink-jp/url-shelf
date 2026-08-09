@@ -5,8 +5,7 @@
 出ます。エントリごとに **プライベートウィンドウで開く** 指定ができるので、調査対象の URL を
 通常セッションに触れさせずに開けます。
 
-> **現状: 開発中・未リリース。** 棚の機能は動作します。パッケージングとリリースは未了です。
-> 設計の全体は [docs/ja/url-shelf-rfp.ja.md](docs/ja/url-shelf-rfp.ja.md) を参照。
+設計の全体は [docs/ja/url-shelf-rfp.ja.md](docs/ja/url-shelf-rfp.ja.md) を参照。
 
 English: [README.md](README.md)
 
@@ -105,8 +104,6 @@ make package    # notarize + staple + リリース用 zip
 macOS 13 以降・Apple Silicon が必要です。
 
 ## インストール
-
-未リリース。公開後は以下で入ります。
 
 ```sh
 brew install --cask nlink-jp/tap/url-shelf
