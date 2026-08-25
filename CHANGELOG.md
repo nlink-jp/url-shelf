@@ -3,7 +3,7 @@
 All notable changes to url-shelf are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
-## [Unreleased]
+## [0.1.1] - 2026-08-25
 
 ### Fixed
 
@@ -15,6 +15,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/).
   Info.plist stops LaunchServices launches, and a startup guard exits
   with a stderr note when another instance is already running (covers
   direct binary exec and `open -n`)
+
+[0.1.1]: https://github.com/nlink-jp/url-shelf/releases/tag/v0.1.1
 
 ## [0.1.0] - 2026-07-26
 
