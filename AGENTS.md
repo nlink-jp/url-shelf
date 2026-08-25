@@ -40,7 +40,10 @@ Info.plist                      bundle template; ${APP_NAME}/${BUNDLE_ID}/${VERS
 Makefile                        build / build-app / package / brew
 scripts/                        codesign + notarize + cask generation (vendored from .github/templates)
 Sources/URLShelf/
-  App.swift                     @main (AppKit entry, .accessory policy) + AppDelegate + AppInfo.version
+  App.swift                     @main (AppKit entry, .accessory policy; runs the
+                                single-instance guard first) + AppDelegate + AppInfo.version
+  SingleInstance.swift          singleInstanceDecision() — startup duplicate-
+                                instance guard (pure; pids in, decision out)
   AppModel.swift                @MainActor orchestrator; config, plans, shelf mutations
   StatusItemController.swift    NSStatusItem + NSMenu; rebuilds the menu in menuNeedsUpdate
   Models/
@@ -81,6 +84,15 @@ Resolution order: **entry > nearest ancestor folder > global config**
 
 ## Gotchas
 
+- **App launches resolve by bundle ID — enforce a single instance.**
+  LaunchServices resolves `jp.nlink.url-shelf` among *all* registered copies
+  (`dist/` dev builds, release-verification extractions, `/Applications`)
+  and may start a different copy than the running one → two menu bar items.
+  Guarded at two layers: `LSMultipleInstancesProhibited` (Info.plist, stops
+  LaunchServices launches) and a startup check in `URLShelfMain.main`
+  (`singleInstanceDecision`, pure + tested) that exits with a stderr note
+  (covers direct exec / `open -n`). Side effect: to run a `dist/` build,
+  quit the installed instance first — a second copy now refuses to start.
 - **`NSApplication.delegate` is weak** — `URLShelfMain` owns the delegate in a
   static, otherwise it is deallocated immediately after `main()`.
 - **`NSStatusItem`, not `MenuBarExtra`** — required for lazy submenu population,

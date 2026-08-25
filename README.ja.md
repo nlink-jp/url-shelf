@@ -42,6 +42,10 @@ English: [README.md](README.md)
 <key>jp.ne.nlink.browser</key>  <string>org.mozilla.firefox</string>
 ```
 
+アプリは単一インスタンスで動作します。2 つ目の起動（例: 起動が別の場所の
+.app に解決された場合）は stderr にログを出して即終了し、実行中の
+インスタンスには影響しません。
+
 ## プライベートウィンドウ
 
 | ブラウザ | プライベート起動 |

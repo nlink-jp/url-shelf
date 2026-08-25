@@ -42,6 +42,10 @@ namespace, so the file stays a valid web location:
 <key>jp.ne.nlink.browser</key>  <string>org.mozilla.firefox</string>
 ```
 
+The app is single-instance: starting a second copy (for example, a
+launch resolving to a different copy of the .app) logs to stderr and
+exits, leaving the running instance alone.
+
 ## Private windows
 
 | Browser | Private launch |

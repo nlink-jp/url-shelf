@@ -3,6 +3,19 @@
 All notable changes to url-shelf are documented here.
 The format is based on [Keep a Changelog](https://keepachangelog.com/).
 
+## [Unreleased]
+
+### Fixed
+
+- Opening the app a second time could start a second instance (two menu
+  bar items): LaunchServices resolves the bundle identifier among all
+  registered copies of the .app (dev build in `dist/`, `/Applications`)
+  and may launch a different copy than the running one. The app is now
+  single-instance at two layers: `LSMultipleInstancesProhibited` in
+  Info.plist stops LaunchServices launches, and a startup guard exits
+  with a stderr note when another instance is already running (covers
+  direct binary exec and `open -n`)
+
 ## [0.1.0] - 2026-07-26
 
 Initial release.
